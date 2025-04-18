@@ -246,8 +246,8 @@ float ImSearch::StringMatcher::operator()(const char* text_body) const
 		return 1.0f;
 	}
 
-	int current = 0;
-	for (int i = 0; text_body[i] != '\0'; ++i)
+	size_t current = 0;
+	for (size_t i = 0; text_body[i] != '\0'; ++i)
 	{
 		if (text_body[i] == mUserQuery[current])
 		{

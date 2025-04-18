@@ -1,6 +1,7 @@
 #pragma once
-
 #ifndef IMGUI_DISABLE
+
+#include <cstddef>
 
 namespace ImSearch
 {
