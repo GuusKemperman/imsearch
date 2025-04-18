@@ -11,7 +11,27 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		return;
 	}
 
-	ImGui::TextUnformatted("TODO: Create ImSearch!");
+	if (ImGui::TreeNode("Simple"))
+	{
+		ImSearch::BeginSearch();
+
+		const char* arr[6]{ "John", "Susan", "Johnathan", "Bob", "Mandy", "Mary" };
+
+		for (int i = 0; i < 6; i++)
+		{
+			ImSearch::PushSearchable(arr[i], 
+				[](const char* str) 
+				{ 
+					ImGui::TextUnformatted(str);
+					return true;
+				});
+			ImSearch::PopSearchable();
+		}
+
+		ImSearch::EndSearch();
+		ImGui::TreePop();
+	}
+
 	ImGui::End();
 }
 
