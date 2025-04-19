@@ -267,7 +267,7 @@ namespace
 
 		ImSearch::StringMatcher matcher{ result.mInput.mUserQuery.c_str() };
 
-		for (size_t i = 0; i < entries.size(); i++)
+		for (IndexT i = 0; i < static_cast<IndexT>(entries.size()); i++)
 		{
 			const std::string& text = entries[i].mText;
 
@@ -277,7 +277,7 @@ namespace
 		}
 
 		std::stable_sort(result.mOutput.mDisplayOrder.begin(), result.mOutput.mDisplayOrder.end(),
-			[&](size_t lhsIndex, size_t rhsIndex) -> bool
+			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
 			{
 				const float lhsScore = result.mBuffers.mScores[lhsIndex];
 				const float rhsScore = result.mBuffers.mScores[rhsIndex];
