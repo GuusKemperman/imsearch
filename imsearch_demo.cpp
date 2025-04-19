@@ -22,7 +22,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		return;
 	}
 
-	size_t seed = 0xbadC0ffee;
+	size_t seed = static_cast<size_t>(0xbadC0ffee);
 
 	// Reuse the same string
 	// when generating random strings,
