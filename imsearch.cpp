@@ -77,7 +77,7 @@ namespace
 void ImSearch::BeginSearch()
 {
 	const ImGuiID imId = ImGui::GetID("Search");
-	ImGui::PushID(imId);
+	ImGui::PushID(static_cast<int>(imId));
 
 	sContextStack.emplace(sContexts[imId]);
 	SearchContext& context = sContextStack.top();
@@ -88,7 +88,7 @@ void ImSearch::BeginSearch()
 	std::string& str = context.mInput.mUserQuery;
 	ImGui::InputTextWithHint(sDefaultLabel,
 		sDefaultHint,
-		(char*)str.c_str(),
+		const_cast<char*>(str.c_str()),
 		str.capacity() + 1,
 		ImGuiInputTextFlags_CallbackResize,
 		+[](ImGuiInputTextCallbackData* data) -> int
@@ -100,7 +100,7 @@ void ImSearch::BeginSearch()
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
 				IM_ASSERT(data->Buf == str->c_str());
 				str->resize(data->BufTextLen);
-				data->Buf = (char*)str->c_str();
+				data->Buf = const_cast<char*>(str->c_str());
 			}
 			return 0;
 		},
@@ -143,7 +143,7 @@ bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)>
 	searchable.mOnDisplayStart = std::move(displayStart);
 
 	const IndexT currentIndex = static_cast<IndexT>(context.mInput.mEntries.size() - static_cast<size_t>(1ull));
-
+	
 	if (!context.mPushStack.empty())
 	{
 		const IndexT parentIndex = context.mPushStack.top();

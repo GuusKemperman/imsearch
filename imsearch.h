@@ -1,8 +1,6 @@
 #pragma once
 #include <functional>
 
-#include "imgui.h"
-
 #ifndef IMGUI_DISABLE
 
 namespace ImSearch
