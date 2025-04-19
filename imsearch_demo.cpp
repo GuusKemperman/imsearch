@@ -68,7 +68,37 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
-	if (ImGui::TreeNode("Nested"))
+    if (ImGui::TreeNode("Simple hierarchy"))
+    {
+        ImSearch::BeginSearch();
+
+        if (ImSearch::TreeNode("I'm the root!"))
+        {
+            if (ImSearch::TreeNode("I'm the first kid, I got children of my own:"))
+            {
+                if (ImSearch::TreeNode("Hi! I'm a kid too. Here are my kids:"))
+                {
+					ImSearch::TextUnformatted("Kay");
+					ImSearch::TextUnformatted("Leo");
+					ImSearch::TextUnformatted("Marcin");
+					ImSearch::TextUnformatted("Nikola");
+					ImSearch::TextUnformatted("Jelle");
+					ImSearch::TextUnformatted("Orhan");
+                    ImSearch::TextUnformatted("Stez");
+                    ImSearch::TreePop();
+                }
+                ImSearch::TreePop();
+            }
+            ImSearch::TextUnformatted("I'm the second kid, I have no children :(");
+
+            ImSearch::TreePop();
+        }
+
+        ImSearch::EndSearch();
+        ImGui::TreePop();
+    }
+
+	if (ImGui::TreeNode("Large hierarchy"))
 	{
 		ImSearch::BeginSearch();
 
