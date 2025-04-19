@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <type_traits>
 #include <numeric>
+#include <limits>
 
 namespace
 {
