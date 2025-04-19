@@ -52,7 +52,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	{
 		ImSearch::BeginSearch();
 
-		for (int i = 0; i < 10'000; i++)
+		for (int i = 0; i < 10000; i++)
 		{
 			ImSearch::PushSearchable(GetRandomString(seed, str),
 				[](const char* str)
