@@ -122,7 +122,7 @@ void ImSearch::EndSearch()
 	sContextStack.pop();
 }
 
-void ImSearch::PushSearchable(const char* name, std::function<bool(const char*)> displayStart)
+bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)> displayStart)
 {
 	SearchContext& context = sContextStack.top();
 
@@ -132,6 +132,7 @@ void ImSearch::PushSearchable(const char* name, std::function<bool(const char*)>
 	searchable.mOnDisplayStart = std::move(displayStart);
 
 	context.mCategoryStack.emplace(context.mInput.mEntries.size() - static_cast<size_t>(1ull));
+	return true;
 }
 
 void ImSearch::PopSearchable(std::function<void()> displayEnd)
@@ -140,6 +141,24 @@ void ImSearch::PopSearchable(std::function<void()> displayEnd)
 	const size_t indexOfCurrentCategory = context.mCategoryStack.top();
 	context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd = std::move(displayEnd);
 	context.mCategoryStack.pop();
+}
+
+void ImSearch::TextUnformatted(const char* text)
+{
+	if (ImSearch::PushSearchable(text, [](const char* str) { ImGui::TextUnformatted(str); return true; }))
+	{
+		ImSearch::PopSearchable();
+	}
+}
+
+bool ImSearch::TreeNode(const char* text)
+{
+	return ImSearch::PushSearchable(text, [](const char* str) { return ImGui::TreeNode(str); });
+}
+
+void ImSearch::TreePop()
+{
+	ImSearch::PopSearchable([]{ ImGui::TreePop(); });
 }
 
 namespace

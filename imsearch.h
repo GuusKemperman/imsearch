@@ -1,6 +1,8 @@
 #pragma once
 #include <functional>
 
+#include "imgui.h"
+
 #ifndef IMGUI_DISABLE
 
 namespace ImSearch
@@ -15,12 +17,19 @@ namespace ImSearch
 	 */
 	void EndSearch();
 
-	void PushSearchable(const char* name, std::function<bool(const char*)> displayStart);
+	bool PushSearchable(const char* name, std::function<bool(const char*)> displayStart);
 
 	void PopSearchable(std::function<void()> displayEnd = {});
 
 	// Shows the ImSearch demo window (add imsearch_demo.cpp to your sources!)
 	void ShowDemoWindow(bool* p_open = nullptr);
+
+	
+
+	void TextUnformatted(const char* text);
+
+	bool TreeNode(const char* text);
+	void TreePop();
 }
 
 #endif // #ifndef IMGUI_DISABLE
