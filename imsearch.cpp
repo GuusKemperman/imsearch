@@ -177,9 +177,10 @@ bool ImSearch::PushSearchable(const char* name, void* functor, VTable vTable)
 			std::unique_ptr<char[]> memory{};
 		};
 
-		std::shared_ptr<OwningFunctor> owningFunctor = std::make_shared<OwningFunctor>();
+		std::shared_ptr<OwningFunctor> owningFunctor{ new OwningFunctor };
 		owningFunctor->table = vTable;
-		owningFunctor->memory = std::make_unique<char[]>(size);
+		owningFunctor->memory = std::unique_ptr<char[]>{ new char[](size) };
+		vTable(VTableModes::MoveConstruct, functor, owningFunctor->memory.get());
 
 		searchable.mOnDisplayStart =
 			[data = owningFunctor](const char* name) -> bool
@@ -243,9 +244,10 @@ void ImSearch::PopSearchable(void* functor, VTable vTable)
 			std::unique_ptr<char[]> memory{};
 		};
 
-		std::shared_ptr<OwningFunctor> owningFunctor = std::make_shared<OwningFunctor>();
+		std::shared_ptr<OwningFunctor> owningFunctor{ new OwningFunctor };
 		owningFunctor->table = vTable;
-		owningFunctor->memory = std::make_unique<char[]>(size);
+		owningFunctor->memory = std::unique_ptr<char[]>{ new char[](size) };
+		vTable(VTableModes::MoveConstruct, functor, owningFunctor->memory.get());
 
 		context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd =
 			[data = owningFunctor]() -> void
