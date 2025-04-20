@@ -41,6 +41,7 @@ namespace
 	struct ReusableBuffers
 	{
 		std::vector<float> mScores{};
+		std::vector<IndexT> mIndicesToAddToDisplayOrder{};
 	};
 
 	struct Output
@@ -294,15 +295,14 @@ namespace
 		}
 	}
 
-	void AppendToDisplayOrder(const Input& input, const ReusableBuffers& buffers, std::vector<IndexT>& indices, Output& output)
+	void AppendToDisplayOrder(const Input& input, 
+		ReusableBuffers& buffers, 
+		IndexT startInIndicesBuffer,
+		IndexT endInIndicesBuffer,
+		Output& output)
 	{
-		indices.erase(std::remove_if(indices.begin(), indices.end(),
-			[&](IndexT i)
-			{
-				return buffers.mScores[i] < sCutOffStrength;
-			}), indices.end());
-
-		std::stable_sort(indices.begin(), indices.end(),
+		std::stable_sort(buffers.mIndicesToAddToDisplayOrder.begin() + startInIndicesBuffer,
+			buffers.mIndicesToAddToDisplayOrder.begin() + endInIndicesBuffer,
 			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
 			{
 				const float lhsScore = buffers.mScores[lhsIndex];
@@ -311,39 +311,56 @@ namespace
 				return lhsScore > rhsScore;
 			});
 
-		for (IndexT index : indices)
+		for (IndexT indexInIndicesBuffer = startInIndicesBuffer; indexInIndicesBuffer < endInIndicesBuffer; indexInIndicesBuffer++)
 		{
-			output.mDisplayOrder.emplace_back(index);
+			IndexT searchableIndex = buffers.mIndicesToAddToDisplayOrder[indexInIndicesBuffer];
 
-			std::vector<IndexT> nextIndices{};
-			const Searchable& searchable = input.mEntries[index];
+			const IndexT nextStartInIndicesBuffer = static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size());
+
+			output.mDisplayOrder.emplace_back(searchableIndex);
+
+			const Searchable& searchable = input.mEntries[searchableIndex];
 			for (IndexT childIndex = searchable.mIndexOfFirstChild;
 				childIndex != sNullIndex;
 				childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
 			{
-				nextIndices.emplace_back(childIndex);
+				if (buffers.mScores[childIndex] >= sCutOffStrength)
+				{
+					buffers.mIndicesToAddToDisplayOrder.emplace_back(childIndex);
+				}
 			}
-			AppendToDisplayOrder(input, buffers, nextIndices, output);
 
-			output.mDisplayOrder.emplace_back(index | Output::sDisplayEndFlag);
+			const IndexT nextEndInIndicesBuffer = static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size());
+
+			AppendToDisplayOrder(input, 
+				buffers, 
+				nextStartInIndicesBuffer,
+				nextEndInIndicesBuffer, 
+				output);
+
+			output.mDisplayOrder.emplace_back(searchableIndex | Output::sDisplayEndFlag);
 		}
 	}
 
 	void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
 	{
 		output.mDisplayOrder.clear();
+		buffers.mIndicesToAddToDisplayOrder.clear();
 
-		std::vector<IndexT> indices{};
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
-			// First pass only needs roots
-			if (input.mEntries[i].mIndexOfParent == sNullIndex)
+			if (input.mEntries[i].mIndexOfParent == sNullIndex
+				&& buffers.mScores[i] >= sCutOffStrength)
 			{
-				indices.emplace_back(i);
+				buffers.mIndicesToAddToDisplayOrder.emplace_back(i);
 			}
 		}
 
-		AppendToDisplayOrder(input, buffers, indices, output);
+		AppendToDisplayOrder(input, 
+			buffers,
+			0,
+			static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size()),
+			output);
 	}
 
 	void BringResultUpToDate(Result& result)
