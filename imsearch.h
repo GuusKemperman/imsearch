@@ -1,8 +1,6 @@
 #pragma once
 #include <functional>
 
-#include "imgui.h"
-
 #ifndef IMGUI_DISABLE
 
 namespace ImSearch
@@ -23,8 +21,6 @@ namespace ImSearch
 
 	// Shows the ImSearch demo window (add imsearch_demo.cpp to your sources!)
 	void ShowDemoWindow(bool* p_open = nullptr);
-
-	
 
 	void TextUnformatted(const char* text);
 
