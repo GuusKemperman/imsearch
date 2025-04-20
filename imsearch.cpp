@@ -66,6 +66,9 @@ namespace
 	std::unordered_map<ImGuiID, SearchContext> sContexts{};
 	std::stack<std::reference_wrapper<SearchContext>> sContextStack{};
 
+	// Anything below this score is not displayed to the user.
+	constexpr float sCutOffStrength = .3f;
+
 	constexpr const char* sDefaultLabel = "##SearchBar";
 	constexpr const char* sDefaultHint = "Search";
 
@@ -228,62 +231,127 @@ namespace
 		return true;
 	}
 
-	void AppendToDisplayOrder(const Input& input, Output& output, const IndexT indexOfSearchable)
+	void AssignInitialScores(const Input& input, ReusableBuffers& buffers)
 	{
-		IM_ASSERT(indexOfSearchable < input.mEntries.size());
+		buffers.mScores.clear();
+		buffers.mScores.resize(input.mEntries.size());
 
-		output.mDisplayOrder.emplace_back(indexOfSearchable);
-
-		const Searchable& searchable = input.mEntries[indexOfSearchable];
-		for (IndexT childIndex = searchable.mIndexOfFirstChild; 
-			childIndex != sNullIndex; 
-			childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
+		if (input.mUserQuery.empty())
 		{
-			AppendToDisplayOrder(input, output, childIndex);
+			std::fill(buffers.mScores.begin(), buffers.mScores.end(), 1.0f);
+			return;
 		}
 
-		output.mDisplayOrder.emplace_back(indexOfSearchable | Output::sDisplayEndFlag);
+		ImSearch::StringMatcher matcher{ input.mUserQuery.c_str() };
+
+		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
+		{
+			const std::string& text = input.mEntries[i].mText;
+
+			const float score = matcher(text.c_str());
+			buffers.mScores[i] = score;
+		}
+	}
+
+	void PropagateScoreToChildren(const Input& input, ReusableBuffers& buffers)
+	{
+		// Each node can only be the child of ONE parent.
+		// Children can only be submitted AFTER their parent.
+		// When iterating over the nodes, we will always
+		// encounter a parent before a child.
+		for (IndexT parentIndex = 0; parentIndex < static_cast<IndexT>(input.mEntries.size()); parentIndex++)
+		{
+			const Searchable& parent = input.mEntries[parentIndex];
+			const float parentScore = buffers.mScores[parentIndex];
+
+			for (IndexT childIndex = parent.mIndexOfFirstChild;
+				childIndex != sNullIndex;
+				childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
+			{
+				float& childScore = buffers.mScores[childIndex];
+				childScore = std::max(childScore, parentScore);
+			}
+		}
+	}
+
+	void PropagateScoreToParents(const Input& input, ReusableBuffers& buffers)
+	{
+		// Children can only be submitted AFTER their parent.
+		// When iterating over the entries in reverse, we will
+		// always reach a node's child before the node itself.
+		for (IndexT childIndex = static_cast<IndexT>(input.mEntries.size()); childIndex --> 0;)
+		{
+			const IndexT parentIndex = input.mEntries[childIndex].mIndexOfParent;
+
+			if (parentIndex == sNullIndex)
+			{
+				continue;
+			}
+
+			const float childScore = buffers.mScores[childIndex];
+			float& parentScore = buffers.mScores[parentIndex];
+			parentScore = std::max(parentScore, childScore);
+		}
+	}
+
+	void AppendToDisplayOrder(const Input& input, const ReusableBuffers& buffers, std::vector<IndexT>& indices, Output& output)
+	{
+		indices.erase(std::remove_if(indices.begin(), indices.end(),
+			[&](IndexT i)
+			{
+				return buffers.mScores[i] < sCutOffStrength;
+			}), indices.end());
+
+		std::stable_sort(indices.begin(), indices.end(),
+			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
+			{
+				const float lhsScore = buffers.mScores[lhsIndex];
+				const float rhsScore = buffers.mScores[rhsIndex];
+
+				return lhsScore > rhsScore;
+			});
+
+		for (IndexT index : indices)
+		{
+			output.mDisplayOrder.emplace_back(index);
+
+			std::vector<IndexT> nextIndices{};
+			const Searchable& searchable = input.mEntries[index];
+			for (IndexT childIndex = searchable.mIndexOfFirstChild;
+				childIndex != sNullIndex;
+				childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
+			{
+				nextIndices.emplace_back(childIndex);
+			}
+			AppendToDisplayOrder(input, buffers, nextIndices, output);
+
+			output.mDisplayOrder.emplace_back(index | Output::sDisplayEndFlag);
+		}
+	}
+
+	void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
+	{
+		output.mDisplayOrder.clear();
+
+		std::vector<IndexT> indices{};
+		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
+		{
+			// First pass only needs roots
+			if (input.mEntries[i].mIndexOfParent == sNullIndex)
+			{
+				indices.emplace_back(i);
+			}
+		}
+
+		AppendToDisplayOrder(input, buffers, indices, output);
 	}
 
 	void BringResultUpToDate(Result& result)
 	{
-		result.mOutput.mDisplayOrder.clear();
-		result.mBuffers.mScores.clear();
-
-		const std::vector<Searchable>& entries = result.mInput.mEntries;
-		result.mBuffers.mScores.resize(entries.size());
-
-		if (result.mInput.mUserQuery.empty())
-		{
-			for (IndexT i = 0; i < static_cast<IndexT>(result.mInput.mEntries.size()); i++)
-			{
-				if (result.mInput.mEntries[i].mIndexOfParent == sNullIndex)
-				{
-					AppendToDisplayOrder(result.mInput, result.mOutput, i);
-				}
-			}
-			return;
-		}
-
-		ImSearch::StringMatcher matcher{ result.mInput.mUserQuery.c_str() };
-
-		for (IndexT i = 0; i < static_cast<IndexT>(entries.size()); i++)
-		{
-			const std::string& text = entries[i].mText;
-
-			const float score = matcher(text.c_str());
-			result.mBuffers.mScores[i] = score;
-			result.mOutput.mDisplayOrder.emplace_back(i);
-		}
-
-		std::stable_sort(result.mOutput.mDisplayOrder.begin(), result.mOutput.mDisplayOrder.end(),
-			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
-			{
-				const float lhsScore = result.mBuffers.mScores[lhsIndex];
-				const float rhsScore = result.mBuffers.mScores[rhsIndex];
-
-				return lhsScore > rhsScore;
-			});
+		AssignInitialScores(result.mInput, result.mBuffers);
+		PropagateScoreToChildren(result.mInput, result.mBuffers);
+		PropagateScoreToParents(result.mInput, result.mBuffers);
+		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
 	}
 
 	void DisplayToUser(const Result& result)

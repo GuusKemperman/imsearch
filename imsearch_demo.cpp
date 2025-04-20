@@ -78,6 +78,8 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             {
                 if (ImSearch::TreeNode("Hi! I'm a kid too. Here are my kids:"))
                 {
+					ImSearch::TextUnformatted("Amzy");
+					ImSearch::TextUnformatted("Alfonso");
 					ImSearch::TextUnformatted("Kay");
 					ImSearch::TextUnformatted("Leo");
 					ImSearch::TextUnformatted("Marcin");
