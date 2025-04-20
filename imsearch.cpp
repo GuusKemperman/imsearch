@@ -1,4 +1,6 @@
 
+#include <functional>
+#include <memory>
 #ifndef IMGUI_DISABLE
 
 #include "imsearch.h"
@@ -20,9 +22,18 @@ namespace
 
 	constexpr IndexT sNullIndex = std::numeric_limits<IndexT>::max();
 
+	enum VTableModes
+	{
+		Invoke = 0,
+		MoveConstruct = 1,
+		Destruct = 2,
+		GetSize = 3
+	};
+
 	struct Searchable
 	{
 		std::string mText{};
+
 		std::function<bool(const char*)> mOnDisplayStart{};
 		std::function<void()> mOnDisplayEnd{};
 
@@ -137,14 +148,45 @@ void ImSearch::EndSearch()
 	sContextStack.pop();
 }
 
-bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)> displayStart)
+bool ImSearch::PushSearchable(const char* name)
+{
+	return PushSearchable(name, nullptr, nullptr);
+}
+
+bool ImSearch::PushSearchable(const char* name, void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 
 	context.mInput.mEntries.emplace_back();
 	Searchable& searchable = context.mInput.mEntries.back();
 	searchable.mText = std::string{ name };
-	searchable.mOnDisplayStart = std::move(displayStart);
+
+	if (functor != nullptr
+		&& vTable != nullptr)
+	{
+		int size;
+		vTable(VTableModes::GetSize, &size, nullptr);
+
+		struct OwningFunctor
+		{
+			~OwningFunctor()
+			{
+				table(VTableModes::Destruct, memory.get(), nullptr);
+			}
+			VTable table{};
+			std::unique_ptr<char[]> memory{};
+		};
+
+		std::shared_ptr<OwningFunctor> owningFunctor = std::make_shared<OwningFunctor>();
+		owningFunctor->table = vTable;
+		owningFunctor->memory = std::make_unique<char[]>(size);
+
+		searchable.mOnDisplayStart =
+			[data = owningFunctor](const char* name) -> bool
+			{
+				return data->table(VTableModes::Invoke, data->memory.get(), const_cast<char*>(name));
+			};
+	}
 
 	const IndexT currentIndex = static_cast<IndexT>(context.mInput.mEntries.size() - static_cast<size_t>(1ull));
 	
@@ -175,11 +217,43 @@ bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)>
 	return true;
 }
 
-void ImSearch::PopSearchable(std::function<void()> displayEnd)
+void ImSearch::PopSearchable()
+{
+	PopSearchable(nullptr, nullptr);
+}
+
+void ImSearch::PopSearchable(void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 	const size_t indexOfCurrentCategory = context.mPushStack.top();
-	context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd = std::move(displayEnd);
+
+	if (functor != nullptr
+		&& vTable != nullptr)
+	{
+		int size;
+		vTable(VTableModes::GetSize, &size, nullptr);
+
+		struct OwningFunctor
+		{
+			~OwningFunctor()
+			{
+				table(VTableModes::Destruct, memory.get(), nullptr);
+			}
+			VTable table{};
+			std::unique_ptr<char[]> memory{};
+		};
+
+		std::shared_ptr<OwningFunctor> owningFunctor = std::make_shared<OwningFunctor>();
+		owningFunctor->table = vTable;
+		owningFunctor->memory = std::make_unique<char[]>(size);
+
+		context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd =
+			[data = owningFunctor]() -> void
+			{
+				data->table(VTableModes::Invoke, data->memory.get(), nullptr);
+			};
+	}
+
 	context.mPushStack.pop();
 }
 
