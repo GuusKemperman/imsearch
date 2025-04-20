@@ -183,9 +183,9 @@ bool ImSearch::PushSearchable(const char* name, void* functor, VTable vTable)
 		vTable(VTableModes::MoveConstruct, functor, owningFunctor->memory.get());
 
 		searchable.mOnDisplayStart =
-			[data = owningFunctor](const char* name) -> bool
+			[=](const char* name) -> bool
 			{
-				return data->table(VTableModes::Invoke, data->memory.get(), const_cast<char*>(name));
+				return owningFunctor->table(VTableModes::Invoke, owningFunctor->memory.get(), const_cast<char*>(name));
 			};
 	}
 
@@ -250,9 +250,9 @@ void ImSearch::PopSearchable(void* functor, VTable vTable)
 		vTable(VTableModes::MoveConstruct, functor, owningFunctor->memory.get());
 
 		context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd =
-			[data = owningFunctor]() -> void
+			[=]() -> void
 			{
-				data->table(VTableModes::Invoke, data->memory.get(), nullptr);
+				owningFunctor->table(VTableModes::Invoke, owningFunctor->memory.get(), nullptr);
 			};
 	}
 
