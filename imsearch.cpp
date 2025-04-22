@@ -1,10 +1,10 @@
-
 #ifndef IMGUI_DISABLE
 
 #include "imsearch.h"
 #include "imsearch_internal.h"
 #include "imgui.h"
 
+#include <memory>
 #include <vector>
 #include <string>
 #include <stack>
@@ -20,11 +20,60 @@ namespace
 
 	constexpr IndexT sNullIndex = std::numeric_limits<IndexT>::max();
 
+	// Here is why we are using VTables instead of just std::function:
+	// std::function's SBO optimisation means it might consume
+	// more memory than needed if the user has not captured anything,
+	// and if the user is capturing more than fits in the SBO storage,
+	// performance tanks due to the many heap allocations. Now,
+	// the VTableFunctor is slower than using std::function, it makes
+	// the implementation and API slightly more complicated, BUT, if we
+	// were to release with std::function in the public API, I would not
+	// be able to get rid of std::function without breaking forward
+	// compatibility in the future. By keeping the concept of how functors
+	// are stored abstracted away in the backend, it can be optimised in
+	// the future without breaking API.
+	struct VTableFunctor
+	{
+		VTableFunctor() = default;
+
+		VTableFunctor(void* originalFunctor, ImSearch::VTable vTable);
+
+		VTableFunctor(VTableFunctor&& other) noexcept;
+
+		VTableFunctor& operator=(VTableFunctor&& other) noexcept;
+
+		// std::function REQUIRES a copyable function object,
+		// even though we are only ever moving the std::function around
+		VTableFunctor(const VTableFunctor&) { IM_ASSERT(false && "Functor was copied"); }
+		VTableFunctor& operator=(const VTableFunctor&) { IM_ASSERT(false && "Functor was copied"); return *this; }
+
+		~VTableFunctor();
+
+		operator bool() const { return mData != nullptr; }
+
+		// PushSearchable
+		bool operator()(const char* name) const;
+
+		// PopSearchable
+		void operator()() const;
+
+		void ClearData();
+
+		enum VTableModes
+		{
+			Invoke = 0,
+			MoveConstruct = 1,
+			Destruct = 2,
+			GetSize = 3
+		};
+
+		ImSearch::VTable mVTable{};
+		std::unique_ptr<char[]> mData{};
+	};
+
 	struct Searchable
 	{
 		std::string mText{};
-		std::function<bool(const char*)> mOnDisplayStart{};
-		std::function<void()> mOnDisplayEnd{};
 
 		IndexT mIndexOfFirstChild = sNullIndex;
 		IndexT mIndexOfLastChild = sNullIndex;
@@ -57,9 +106,17 @@ namespace
 		Output mOutput{};
 	};
 
+	struct DisplayCallbacks
+	{
+		VTableFunctor mOnDisplayStart{};
+		VTableFunctor mOnDisplayEnd{};
+	};
+
 	struct SearchContext
 	{
 		Input mInput{};
+
+		std::vector<DisplayCallbacks> mDisplayCallbacks{};
 
 		std::stack<IndexT> mPushStack{};
 		Result mResult{};
@@ -75,7 +132,7 @@ namespace
 
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
 	void BringResultUpToDate(Result& result);
-	void DisplayToUser(const Result& result);
+	void DisplayToUser(const SearchContext& context, const Result& result);
 }
 
 void ImSearch::BeginSearch()
@@ -127,24 +184,31 @@ void ImSearch::EndSearch()
 		BringResultUpToDate(lastValidResult);
 	}
 
-	DisplayToUser(lastValidResult);
+	DisplayToUser(context, lastValidResult);
 
 	ImGui::PopID();
 
 	context.mInput.mEntries.clear();
+	context.mDisplayCallbacks.clear();
 	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
 
 	sContextStack.pop();
 }
 
-bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)> displayStart)
+bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 
 	context.mInput.mEntries.emplace_back();
 	Searchable& searchable = context.mInput.mEntries.back();
 	searchable.mText = std::string{ name };
-	searchable.mOnDisplayStart = std::move(displayStart);
+
+	context.mDisplayCallbacks.emplace_back();
+	if (functor != nullptr
+		&& vTable != nullptr)
+	{
+		context.mDisplayCallbacks.back().mOnDisplayStart = VTableFunctor{ functor, vTable };
+	}
 
 	const IndexT currentIndex = static_cast<IndexT>(context.mInput.mEntries.size() - static_cast<size_t>(1ull));
 	
@@ -175,11 +239,22 @@ bool ImSearch::PushSearchable(const char* name, std::function<bool(const char*)>
 	return true;
 }
 
-void ImSearch::PopSearchable(std::function<void()> displayEnd)
+void ImSearch::PopSearchable()
+{
+	Internal::PopSearchable(nullptr, nullptr);
+}
+
+void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 	const size_t indexOfCurrentCategory = context.mPushStack.top();
-	context.mInput.mEntries[indexOfCurrentCategory].mOnDisplayEnd = std::move(displayEnd);
+
+	if (functor != nullptr
+		&& vTable != nullptr)
+	{
+		context.mDisplayCallbacks[indexOfCurrentCategory].mOnDisplayEnd = VTableFunctor{ functor, vTable };
+	}
+
 	context.mPushStack.pop();
 }
 
@@ -211,6 +286,71 @@ void ImSearch::TreePop()
 
 namespace
 {
+	VTableFunctor::VTableFunctor(void* originalFunctor, ImSearch::VTable vTable) :
+		mVTable(vTable)
+	{
+		if (mVTable == nullptr)
+		{
+			return;
+		}
+
+		int size;
+		vTable(VTableModes::GetSize, &size, nullptr);
+		mData = std::unique_ptr<char[]>{ new char[size] };
+		vTable(VTableModes::MoveConstruct, originalFunctor, mData.get());
+	}
+
+	VTableFunctor::VTableFunctor(VTableFunctor&& other) noexcept:
+		mVTable(std::move(other.mVTable)),
+		mData(std::move(other.mData))
+	{
+		other.mVTable = nullptr;
+		other.mData = nullptr;
+	}
+
+	VTableFunctor& VTableFunctor::operator=(VTableFunctor&& other) noexcept
+	{
+		if (this == &other)
+		{
+			return *this;
+		}
+
+		ClearData();
+
+		mVTable = std::move(other.mVTable);
+		mData = std::move(other.mData);
+
+		other.mVTable = nullptr;
+		other.mData = nullptr;
+		return *this;
+	}
+
+	VTableFunctor::~VTableFunctor()
+	{
+		ClearData();
+	}
+
+	bool VTableFunctor::operator()(const char* name) const
+	{
+		return mVTable(VTableModes::Invoke, mData.get(), const_cast<char*>(name));
+	}
+
+	void VTableFunctor::operator()() const
+	{
+		mVTable(VTableModes::Invoke, mData.get(), nullptr);
+	}
+
+	void VTableFunctor::ClearData()
+	{
+		if (mData == nullptr)
+		{
+			return;
+		}
+
+		mVTable(VTableModes::Destruct, mData.get(), nullptr);
+		mData = nullptr;
+	}
+
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput)
 	{
 		const Input& oldInput = oldResult.mInput;
@@ -224,7 +364,13 @@ namespace
 		// C++11 didnt have nice algorithms for comparing ranges :(
 		for (size_t i = 0; i < oldInput.mEntries.size(); i++)
 		{
-			if (oldInput.mEntries[i].mText != currentInput.mEntries[i].mText)
+			const Searchable& oldEntry = oldInput.mEntries[i];
+			const Searchable& newEntry = currentInput.mEntries[i];
+			if (oldEntry.mText != newEntry.mText
+				|| oldEntry.mIndexOfFirstChild != newEntry.mIndexOfFirstChild
+				|| oldEntry.mIndexOfLastChild != newEntry.mIndexOfLastChild
+				|| oldEntry.mIndexOfParent != newEntry.mIndexOfParent
+				|| oldEntry.mIndexOfNextSibling != newEntry.mIndexOfNextSibling)
 			{
 				return false;
 			}
@@ -371,7 +517,7 @@ namespace
 		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
 	}
 
-	void DisplayToUser(const Result& result)
+	void DisplayToUser(const SearchContext& context, const Result& result)
 	{
 		const bool isUserSearching = !result.mInput.mUserQuery.empty();
 		ImGui::PushID(isUserSearching);
@@ -385,17 +531,18 @@ namespace
 			const IndexT isEnd = indexAndFlag & Output::sDisplayEndFlag;
 
 			const Searchable& searchable = result.mInput.mEntries[index];
+			const DisplayCallbacks& callbacks = context.mDisplayCallbacks[index];
 
 			if (isEnd)
 			{
-				if (searchable.mOnDisplayEnd)
+				if (callbacks.mOnDisplayEnd)
 				{
-					searchable.mOnDisplayEnd();
+					callbacks.mOnDisplayEnd();
 				}
 				continue;
 			}
 
-			if (!searchable.mOnDisplayStart)
+			if (!callbacks.mOnDisplayStart)
 			{
 				continue;
 			}
@@ -405,7 +552,7 @@ namespace
 				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
 			}
 
-			if (searchable.mOnDisplayStart(searchable.mText.c_str()))
+			if (callbacks.mOnDisplayStart(searchable.mText.c_str()))
 			{
 				continue;
 			}
