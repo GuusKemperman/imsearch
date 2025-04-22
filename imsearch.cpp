@@ -195,12 +195,7 @@ void ImSearch::EndSearch()
 	sContextStack.pop();
 }
 
-bool ImSearch::PushSearchable(const char* name)
-{
-	return PushSearchable(name, nullptr, nullptr);
-}
-
-bool ImSearch::PushSearchable(const char* name, void* functor, VTable vTable)
+bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 
@@ -246,10 +241,10 @@ bool ImSearch::PushSearchable(const char* name, void* functor, VTable vTable)
 
 void ImSearch::PopSearchable()
 {
-	PopSearchable(nullptr, nullptr);
+	Internal::PopSearchable(nullptr, nullptr);
 }
 
-void ImSearch::PopSearchable(void* functor, VTable vTable)
+void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
 	const size_t indexOfCurrentCategory = context.mPushStack.top();
