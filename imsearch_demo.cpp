@@ -49,6 +49,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
+#if __cplusplus >= 201402L
     if (ImGui::TreeNode("Different functors"))
     {
         ImSearch::BeginSearch();
@@ -58,6 +59,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             const std::string tooltip = GetRandomString(seed, str);
             ImSearch::PushSearchable(GetRandomString(seed, str),
                 // You can capture anything in the lambda you might need.
+                // Note that this requires C++14 or above
                 [capturedTooltip = tooltip](const char* str)
                 {
                     ImGui::TextUnformatted(str);
@@ -76,6 +78,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         ImSearch::EndSearch();
         ImGui::TreePop();
     }
+#endif
 
 	if (ImGui::TreeNode("Many"))
 	{
