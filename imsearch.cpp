@@ -38,14 +38,11 @@ namespace
 
 		VTableFunctor(void* originalFunctor, ImSearch::VTable vTable);
 
+		VTableFunctor(const VTableFunctor&) = delete;
 		VTableFunctor(VTableFunctor&& other) noexcept;
 
+		VTableFunctor& operator=(const VTableFunctor&) = delete;
 		VTableFunctor& operator=(VTableFunctor&& other) noexcept;
-
-		// std::function REQUIRES a copyable function object,
-		// even though we are only ever moving the std::function around
-		VTableFunctor(const VTableFunctor&) { IM_ASSERT(false && "Functor was copied"); }
-		VTableFunctor& operator=(const VTableFunctor&) { IM_ASSERT(false && "Functor was copied"); return *this; }
 
 		~VTableFunctor();
 
@@ -68,7 +65,7 @@ namespace
 		};
 
 		ImSearch::VTable mVTable{};
-		std::unique_ptr<char[]> mData{};
+		char* mData{};
 	};
 
 	struct Searchable
@@ -296,13 +293,14 @@ namespace
 
 		int size;
 		vTable(VTableModes::GetSize, &size, nullptr);
-		mData = std::unique_ptr<char[]>{ new char[size] };
-		vTable(VTableModes::MoveConstruct, originalFunctor, mData.get());
+		mData = static_cast<char*>(ImGui::MemAlloc(static_cast<size_t>(size)));
+		IM_ASSERT(mData != nullptr);
+		vTable(VTableModes::MoveConstruct, originalFunctor, mData);
 	}
 
 	VTableFunctor::VTableFunctor(VTableFunctor&& other) noexcept:
-		mVTable(std::move(other.mVTable)),
-		mData(std::move(other.mData))
+		mVTable(other.mVTable),
+		mData(other.mData)
 	{
 		other.mVTable = nullptr;
 		other.mData = nullptr;
@@ -317,11 +315,12 @@ namespace
 
 		ClearData();
 
-		mVTable = std::move(other.mVTable);
-		mData = std::move(other.mData);
+		mVTable = other.mVTable;
+		mData = other.mData;
 
 		other.mVTable = nullptr;
 		other.mData = nullptr;
+
 		return *this;
 	}
 
@@ -332,12 +331,12 @@ namespace
 
 	bool VTableFunctor::operator()(const char* name) const
 	{
-		return mVTable(VTableModes::Invoke, mData.get(), const_cast<char*>(name));
+		return mVTable(VTableModes::Invoke, mData, const_cast<char*>(name));
 	}
 
 	void VTableFunctor::operator()() const
 	{
-		mVTable(VTableModes::Invoke, mData.get(), nullptr);
+		mVTable(VTableModes::Invoke, mData, nullptr);
 	}
 
 	void VTableFunctor::ClearData()
@@ -347,7 +346,9 @@ namespace
 			return;
 		}
 
-		mVTable(VTableModes::Destruct, mData.get(), nullptr);
+		mVTable(VTableModes::Destruct, mData, nullptr);
+
+		ImGui::MemFree(mData);
 		mData = nullptr;
 	}
 
