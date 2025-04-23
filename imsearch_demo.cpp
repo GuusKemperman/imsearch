@@ -33,6 +33,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	if (ImGui::TreeNode("Simple"))
 	{
 		ImSearch::BeginSearch();
+        ImSearch::SearchBar();
 
 		for (int i = 0; i < 6; i++)
 		{
@@ -49,10 +50,39 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
+    if (ImGui::TreeNode("Search bar"))
+    {
+        ImSearch::BeginSearch();
+
+        ImGui::TextUnformatted("Custom search bar!");
+        static char query[2048]{};
+
+        if (ImGui::InputTextMultiline("This is a search bar!", query, sizeof(query)))
+        {
+            ImSearch::SetUserQuery(query);
+        }
+        for (int i = 0; i < 6; i++)
+        {
+            ImSearch::PushSearchable(GetRandomString(seed, str),
+                [](const char* str)
+                {
+                    ImGui::TextUnformatted(str);
+                    return true;
+                });
+            ImSearch::PopSearchable();
+        }
+
+        ImSearch::EndSearch();
+        ImGui::TreePop();
+    }
+
+
+
 #if __cplusplus >= 201402L
     if (ImGui::TreeNode("Different functors"))
     {
         ImSearch::BeginSearch();
+        ImSearch::SearchBar();
 
         for (int i = 0; i < 10; i++)
         {
@@ -74,7 +104,6 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             ImSearch::PopSearchable();
         }
 
-
         ImSearch::EndSearch();
         ImGui::TreePop();
     }
@@ -83,25 +112,41 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	if (ImGui::TreeNode("Many"))
 	{
 		ImSearch::BeginSearch();
+        ImGui::TextUnformatted("SearchBar's can be placed anywhere between BeginSearch and EndSearch; even outside the child window");
+        ImSearch::SearchBar();
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
 
-		for (int i = 0; i < 10000; i++)
-		{
-			ImSearch::PushSearchable(GetRandomString(seed, str),
-				[](const char* str)
-				{
-					ImGui::TextUnformatted(str);
-					return true;
-				});
-			ImSearch::PopSearchable();
-		}
+        if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                ImSearch::PushSearchable(GetRandomString(seed, str),
+                    [](const char* str)
+                    {
+                        ImGui::TextUnformatted(str);
+                        return true;
+                    });
+                ImSearch::PopSearchable();
+            }
 
-		ImSearch::EndSearch();
+            // Call Submit explicitly; all the callbacks
+            // will be invoked through submit. If we
+            // had waited for EndSearch to do this for us,
+            // the callbacks would've been invoked after
+            // ImGui::EndChild, leaving our searchables
+            // to be displayed outside of the child window.
+            ImSearch::Submit();
+        } ImGui::EndChild();
+
+        ImGui::PopStyleColor();
+        ImSearch::EndSearch();
 		ImGui::TreePop();
 	}
 
     if (ImGui::TreeNode("Simple hierarchy"))
     {
         ImSearch::BeginSearch();
+        ImSearch::SearchBar();
 
         if (ImSearch::TreeNode("I'm the root!"))
         {
@@ -134,6 +179,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	if (ImGui::TreeNode("Large hierarchy"))
 	{
 		ImSearch::BeginSearch();
+        ImSearch::SearchBar();
 
         if (ImSearch::TreeNode("Professions"))
         {

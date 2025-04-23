@@ -117,6 +117,7 @@ namespace
 
 		std::stack<IndexT> mPushStack{};
 		Result mResult{};
+		bool mHasSubmitted{};
 	};
 	std::unordered_map<ImGuiID, SearchContext> sContexts{};
 	std::stack<std::reference_wrapper<SearchContext>> sContextStack{};
@@ -124,28 +125,34 @@ namespace
 	// Anything below this score is not displayed to the user.
 	constexpr float sCutOffStrength = .3f;
 
-	constexpr const char* sDefaultLabel = "##SearchBar";
-	constexpr const char* sDefaultHint = "Search";
-
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
 	void BringResultUpToDate(Result& result);
 	void DisplayToUser(const SearchContext& context, const Result& result);
 }
 
-void ImSearch::BeginSearch()
+bool ImSearch::BeginSearch()
 {
 	const ImGuiID imId = ImGui::GetID("Search");
 	ImGui::PushID(static_cast<int>(imId));
 
-	sContextStack.emplace(sContexts[imId]);
+	SearchContext& context = sContexts[imId];
+	sContextStack.emplace(context);
+
+	context.mHasSubmitted = false;
+
+	return true;
+}
+
+void ImSearch::SearchBar(const char* hint)
+{
 	SearchContext& context = sContextStack.top();
 
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
 
 	std::string& str = context.mInput.mUserQuery;
-	ImGui::InputTextWithHint(sDefaultLabel,
-		sDefaultHint,
+	ImGui::InputTextWithHint("##SearchBar",
+		hint,
 		const_cast<char*>(str.c_str()),
 		str.capacity() + 1,
 		ImGuiInputTextFlags_CallbackResize,
@@ -164,13 +171,10 @@ void ImSearch::BeginSearch()
 		},
 		&str);
 
-	if (ImGui::IsWindowAppearing())
-	{
-		ImGui::SetKeyboardFocusHere(-1);
-	}
+	ImGui::SetItemDefaultFocus();
 }
 
-void ImSearch::EndSearch()
+void ImSearch::Submit()
 {
 	SearchContext& context = sContextStack.top();
 	Result& lastValidResult = context.mResult;
@@ -183,18 +187,31 @@ void ImSearch::EndSearch()
 
 	DisplayToUser(context, lastValidResult);
 
-	ImGui::PopID();
-
 	context.mInput.mEntries.clear();
 	context.mDisplayCallbacks.clear();
 	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
+}
 
+void ImSearch::EndSearch()
+{
+	IM_ASSERT(!sContextStack.empty() && "Called End without matching start");
+
+	SearchContext& context = sContextStack.top();
+
+	if (!context.mHasSubmitted)
+	{
+		Submit();
+	}
+
+	ImGui::PopID();
 	sContextStack.pop();
 }
 
 bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
+
+	IM_ASSERT(!context.mHasSubmitted && "Tried calling PushSearchable after EndSearch or Submit");
 
 	context.mInput.mEntries.emplace_back();
 	Searchable& searchable = context.mInput.mEntries.back();
@@ -241,9 +258,27 @@ void ImSearch::PopSearchable()
 	Internal::PopSearchable(nullptr, nullptr);
 }
 
+void ImSearch::SetUserQuery(const char* query)
+{
+	SearchContext& context = sContextStack.top();
+	context.mInput.mUserQuery = std::string{ query };
+}
+
+const char* ImSearch::GetUserQuery()
+{
+	if (sContextStack.empty())
+	{
+		return nullptr;
+	}
+	return sContextStack.top().get().mInput.mUserQuery.c_str();
+}
+
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	SearchContext& context = sContextStack.top();
+
+	IM_ASSERT(!context.mHasSubmitted && "Tried calling PopSearchable after EndSearch or Submit");
+
 	const size_t indexOfCurrentCategory = context.mPushStack.top();
 
 	if (functor != nullptr

@@ -5,12 +5,19 @@
 namespace ImSearch
 {
 	/**
-	 * \brief Adds a search bar. Always requires End() to be called.
+	 * \brief Requires End() to be called if returns true
 	 */
-	void BeginSearch();
+	bool BeginSearch();
+
+	void SearchBar(const char* hint = "Search");
 
 	/**
-	 * \brief Finishes up by starting to call the submitted display functions, in the order of relevancy to the user.
+	 * \brief Calls the submitted display functions, in the order of relevancy to the user.
+	 */
+	void Submit();
+
+	/**
+	 * \brief Calls Submit, if that was not called already, and blocks further submissions.
 	 */
 	void EndSearch();
 
@@ -28,6 +35,10 @@ namespace ImSearch
 
 	template<typename T>
 	void PopSearchable(T&& functor);
+
+	void SetUserQuery(const char* query);
+
+	const char* GetUserQuery();
 
 	// Shows the ImSearch demo window (add imsearch_demo.cpp to your sources!)
 	void ShowDemoWindow(bool* p_open = nullptr);
