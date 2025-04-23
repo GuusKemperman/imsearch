@@ -32,21 +32,32 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
 	if (ImGui::TreeNode("Simple"))
 	{
-		ImSearch::BeginSearch();
-        ImSearch::SearchBar();
-
-		for (int i = 0; i < 6; i++)
+		if (ImSearch::BeginSearch())
 		{
-			ImSearch::PushSearchable(GetRandomString(seed, str),
-				[](const char* str) 
-				{ 
-					ImGui::TextUnformatted(str);
-					return true;
-				});
-			ImSearch::PopSearchable();
+            ImSearch::SearchBar();
+
+            for (int i = 0; i < 6; i++)
+            {
+                static const char* selectedString = nouns[0];
+                const char* randomStr = GetRandomString(seed, str);
+
+            	if (ImSearch::PushSearchable(randomStr,
+                    [](const char* name)
+                    {
+                        if (ImGui::Selectable(name, selectedString == name))
+                        {
+                            selectedString = name;
+                        }
+                        return true;
+                    }))
+                {
+					ImSearch::PopSearchable();
+                }
+            }
+
+            ImSearch::EndSearch();
 		}
 
-		ImSearch::EndSearch();
 		ImGui::TreePop();
 	}
 
@@ -85,34 +96,52 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
     if (ImGui::TreeNode("Search bar"))
     {
-        ImSearch::BeginSearch();
-
-        ImGui::TextUnformatted("Custom search bar!");
-        static char query[2048]{};
-
-        if (ImGui::InputTextMultiline("This is a search bar!", query, sizeof(query)))
+        if (ImSearch::BeginSearch())
         {
-            ImSearch::SetUserQuery(query);
-        }
-        for (int i = 0; i < 6; i++)
-        {
-            ImSearch::PushSearchable(GetRandomString(seed, str),
-                [](const char* str)
+        	static char query[2048]{};
+
+            const float spaceWidth = ImGui::CalcTextSize(" ").y;
+            const float searchbarWidth = ImGui::GetContentRegionAvail().x;
+            const int totalNumCharacters = static_cast<int>(searchbarWidth / spaceWidth) * 2;
+
+            const int timeAsInt = static_cast<int>(ImGui::GetTime() * 10.0);
+
+            constexpr int length = 31;
+            constexpr char hint[length + 1] = "I'm a custom search bar!       ";
+            std::string hintWithSpacing{};
+
+            for (int i = 0; i < totalNumCharacters; i++)
+            {
+                int index = (i + timeAsInt) % length;
+                hintWithSpacing.push_back(hint[index]);
+            }
+
+            if (ImGui::InputTextWithHint("##Searchbar", hintWithSpacing.c_str(), query, sizeof(query)))
+            {
+                ImSearch::SetUserQuery(query);
+            }
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                    [](const char* str)
+                    {
+                        ImGui::Selectable(str);
+                        return true;
+                    }))
                 {
-                    ImGui::TextUnformatted(str);
-                    return true;
-                });
-            ImSearch::PopSearchable();
+                    ImSearch::PopSearchable();
+                }
+            }
+
+            ImSearch::EndSearch();
         }
 
-        ImSearch::EndSearch();
         ImGui::TreePop();
     }
 
-
-
 #if __cplusplus >= 201402L
-    if (ImGui::TreeNode("Different functors"))
+    if (ImGui::TreeNode("Callback user data"))
     {
         ImSearch::BeginSearch();
         ImSearch::SearchBar();
@@ -151,7 +180,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
         if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
         {
-            for (int i = 0; i < 10000; i++)
+            for (int i = 0; i < 100000; i++)
             {
                 ImSearch::PushSearchable(GetRandomString(seed, str),
                     [](const char* str)
@@ -176,7 +205,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
-    if (ImGui::TreeNode("Simple hierarchy"))
+   /* if (ImGui::TreeNode("Simple hierarchy"))
     {
         ImSearch::BeginSearch();
         ImSearch::SearchBar();
@@ -638,11 +667,11 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             }
 
             ImSearch::TreePop();
-        }
+        }*/
 
-		ImSearch::EndSearch();
-		ImGui::TreePop();
-	}
+	//	ImSearch::EndSearch();
+	//	ImGui::TreePop();
+	//}
 
 
 
