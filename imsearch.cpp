@@ -171,7 +171,11 @@ void ImSearch::SearchBar(const char* hint)
 		},
 		&str);
 
-	ImGui::SetItemDefaultFocus();
+	if (ImGui::IsWindowAppearing())
+	{
+		ImGui::SetKeyboardFocusHere();
+		str.clear();
+	}
 }
 
 void ImSearch::Submit()
