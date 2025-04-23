@@ -43,11 +43,6 @@ namespace ImSearch
 	// Shows the ImSearch demo window (add imsearch_demo.cpp to your sources!)
 	void ShowDemoWindow(bool* p_open = nullptr);
 
-	void TextUnformatted(const char* text);
-
-	bool TreeNode(const char* text);
-	void TreePop();
-
 	namespace Internal // Forwards compatibility not guaranteed!
 	{
 		bool PushSearchable(const char* name, void* functor, VTable vTable);

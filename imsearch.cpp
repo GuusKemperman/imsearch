@@ -294,32 +294,6 @@ void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 	context.mPushStack.pop();
 }
 
-void ImSearch::TextUnformatted(const char* text)
-{
-	if (ImSearch::PushSearchable(text, [](const char* str) { ImGui::TextUnformatted(str); return true; }))
-	{
-		ImSearch::PopSearchable();
-	}
-}
-
-bool ImSearch::TreeNode(const char* text)
-{
-	return ImSearch::PushSearchable(text, 
-		[](const char* str)
-		{
-			return ImGui::TreeNode(str);
-		});
-}
-
-void ImSearch::TreePop()
-{
-	ImSearch::PopSearchable(
-		[]()
-		{
-			ImGui::TreePop();
-		});
-}
-
 namespace
 {
 	VTableFunctor::VTableFunctor(void* originalFunctor, ImSearch::VTable vTable) :
