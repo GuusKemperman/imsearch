@@ -50,6 +50,39 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
+    if (ImGui::TreeNode("Combo"))
+    {
+        static const char* selectedString = nouns[0];
+        if (ImGui::BeginCombo("Nouns", selectedString))
+        {
+            if (ImSearch::BeginSearch())
+            {
+                ImSearch::SearchBar();
+                for (const char* noun : nouns)
+                {
+                    if (ImSearch::PushSearchable(noun,
+                        [&](const char* name)
+                        {
+                            const bool isSelected = name == selectedString;
+                            if (ImGui::Selectable(name, isSelected))
+                            {
+                                selectedString = name;
+                            }
+                            return true;
+                        }))
+                    {
+                        ImSearch::PopSearchable();
+                    }
+                }
+
+                ImSearch::EndSearch();
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::TreePop();
+    }
+
     if (ImGui::TreeNode("Search bar"))
     {
         ImSearch::BeginSearch();
