@@ -54,23 +54,24 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		{
             ImSearch::SearchBar();
 
-            for (int i = 0; i < 6; i++)
-            {
-                static const char* selectedString = nouns[0];
-                const char* randomStr = GetRandomString(seed, str);
-
-            	if (ImSearch::PushSearchable(randomStr,
-                    [](const char* name)
-                    {
-                        if (ImGui::Selectable(name, selectedString == name))
-                        {
-                            selectedString = name;
-                        }
-                        return true;
-                    }))
+            if (ImSearch::PushSearchable("Hey there!", 
+                [](const char* name)
                 {
-					ImSearch::PopSearchable();
-                }
+                    ImGui::Selectable(name);
+                    return true;
+                }))
+            {
+                ImSearch::PopSearchable();
+            }
+
+            if (ImSearch::PushSearchable("Howdy partner!",
+                [](const char* name)
+                {
+                    ImGui::Button(name);
+                    return true;
+                }))
+            {
+                ImSearch::PopSearchable();
             }
 
             ImSearch::EndSearch();
@@ -257,7 +258,6 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 				ImSearch::Submit(); // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>^
 			}
 
-            
             ImSearch::EndSearch();
         }
 
