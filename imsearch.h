@@ -47,43 +47,48 @@ namespace ImSearch
 	{
 		bool PushSearchable(const char* name, void* functor, VTable vTable);
 		void PopSearchable(void* functor, VTable vTable);
+
+		template<class T> struct remove_reference { typedef T type; };
+		template<class T> struct remove_reference<T&> { typedef T type; };
+		template<class T> struct remove_reference<T&&> { typedef T type; };
 	}
 }
 
 template<typename T>
 bool ImSearch::PushSearchable(const char* name, T&& functor)
 {
-	T moveable{ static_cast<decltype(functor)>(functor) };
+	using TNonRef = typename Internal::remove_reference<T>::type;
+	TNonRef moveable{ static_cast<decltype(functor)>(functor) };
 	return Internal::PushSearchable(
 		name,
 		&moveable,
-		+[](int mode, void* ptr1, void* ptr2)
+		+[](int mode, void* ptr1, void* ptr2) -> bool
 		{
 			switch (mode)
 			{
 			case 0: // Invoke
 			{
-				T* func = static_cast<T*>(ptr1);
+				TNonRef* func = static_cast<TNonRef*>(ptr1);
 				const char* name = static_cast<const char*>(ptr2);
 				return (*func)(name);
 			}
 			case 1: // Move-construct
 			{
-				T* src = static_cast<T*>(ptr1);
-				T* dst = static_cast<T*>(ptr2);
-				new(dst)T(static_cast<T&&>(*src));
+				TNonRef* src = static_cast<TNonRef*>(ptr1);
+				TNonRef* dst = static_cast<TNonRef*>(ptr2);
+				new(dst)TNonRef(static_cast<TNonRef&&>(*src));
 				return true;
 			}
 			case 2: // Destructor
 			{
-				T* src = static_cast<T*>(ptr1);
-				src->~T();
+				TNonRef* src = static_cast<TNonRef*>(ptr1);
+				src->~TNonRef();
 				return true;
 			}
 			case 3: // Get size
 			{
 				int& ret = *static_cast<int*>(ptr1);
-				ret = sizeof(T);
+				ret = sizeof(TNonRef);
 				return true;
 			}
 			default:
@@ -95,7 +100,8 @@ bool ImSearch::PushSearchable(const char* name, T&& functor)
 template<typename T>
 void ImSearch::PopSearchable(T&& functor)
 {
-	T moveable{ static_cast<decltype(functor)>(functor) };
+	using TNonRef = typename Internal::remove_reference<T>::type;
+	TNonRef moveable{ static_cast<decltype(functor)>(functor) };
 	Internal::PopSearchable(
 		&moveable,
 		+[](int mode, void* ptr1, void* ptr2)
@@ -104,27 +110,27 @@ void ImSearch::PopSearchable(T&& functor)
 			{
 			case 0: // Invoke
 			{
-				T* func = static_cast<T*>(ptr1);
+				TNonRef* func = static_cast<TNonRef*>(ptr1);
 				(*func)();
 				return true;
 			}
 			case 1: // Move-construct
 			{
-				T* src = static_cast<T*>(ptr1);
-				T* dst = static_cast<T*>(ptr2);
-				new(dst)T(static_cast<T&&>(*src));
+				TNonRef* src = static_cast<TNonRef*>(ptr1);
+				TNonRef* dst = static_cast<TNonRef*>(ptr2);
+				new(dst)TNonRef(static_cast<TNonRef&&>(*src));
 				return true;
 			}
 			case 2: // Destructor
 			{
-				T* src = static_cast<T*>(ptr1);
-				src->~T();
+				TNonRef* src = static_cast<TNonRef*>(ptr1);
+				src->~TNonRef();
 				return true;
 			}
 			case 3: // Get size
 			{
 				int& ret = *static_cast<int*>(ptr1);
-				ret = sizeof(T);
+				ret = sizeof(TNonRef);
 				return true;
 			}
 			default:

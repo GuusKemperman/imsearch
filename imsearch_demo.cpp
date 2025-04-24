@@ -5,6 +5,7 @@
 
 #include <array>
 #include <string>
+#include <functional>
 
 namespace
 {
@@ -14,10 +15,24 @@ namespace
 	size_t Rand(size_t& seed);
 	const char* GetRandomString(size_t& seed, std::string& str);
 
+    void HelpMarker(const char* desc);
+
     bool ImSearchDemo_TreeNode(const char* name);
     void ImSearchDemo_TreeLeaf(const char* name);
     void ImSearchDemo_TreePop();
+
+    bool ImSearchDemo_CollapsingHeader(const char* name);
 }
+
+#if defined(_MSVC_LANG)  // MS compiler has different __cplusplus value.
+#   if _MSVC_LANG >= 201402L
+		#define HAS_CPP14
+#   endif
+#else  // All other compilers.
+#   if __cplusplus >= 201402L
+		#define HAS_CPP14
+#   endif
+#endif
 
 void ImSearch::ShowDemoWindow(bool* p_open)
 {
@@ -143,505 +158,706 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         ImGui::TreePop();
     }
 
-#if __cplusplus >= 201402L
-    if (ImGui::TreeNode("Callback user data"))
+    if (ImGui::TreeNode("How do callbacks work?"))
     {
-        ImSearch::BeginSearch();
-        ImSearch::SearchBar();
+        HelpMarker("This displayed section probably won't make a lot of sense if you're not also looking at the code behind it.");
 
-        for (int i = 0; i < 10; i++)
+        if (ImSearch::BeginSearch())
         {
-            const std::string tooltip = GetRandomString(seed, str);
-            ImSearch::PushSearchable(GetRandomString(seed, str),
-                // You can capture anything in the lambda you might need.
-                // Note that this requires C++14 or above
-                [capturedTooltip = tooltip](const char* str)
-                {
-                    ImGui::TextUnformatted(str);
+            ImSearch::SearchBar();
 
-                    if (ImGui::BeginItemTooltip())
-                    {
-                        ImGui::TextUnformatted(capturedTooltip.c_str());
-                        ImGui::EndTooltip();
-                    }
-                	return true;
-                });
-            ImSearch::PopSearchable();
-        }
-
-        ImSearch::EndSearch();
-        ImGui::TreePop();
-    }
-#endif
-
-	if (ImGui::TreeNode("Many"))
-	{
-		ImSearch::BeginSearch();
-        ImGui::TextWrapped("SearchBar's can be placed anywhere between BeginSearch and EndSearch; even outside the child window");
-        ImSearch::SearchBar();
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-
-        if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
-        {
-            for (int i = 0; i < 1000; i++)
+            if (ImSearchDemo_CollapsingHeader("std::functions"))
             {
-                ImSearch::PushSearchable(GetRandomString(seed, str),
-                    [](const char* str)
+                std::function<bool(const char*)> myDisplayStart =
+                    [](const char* str) -> bool
                     {
-                        ImGui::TextUnformatted(str);
-                        return true;
-                    });
+                        return ImGui::TreeNode(str);
+                    };
+
+                std::function<void()> myDisplayEnd =
+                    []()
+                    {
+                        return ImGui::TreePop();
+                    };
+
+                if (ImSearch::PushSearchable("std::function!", myDisplayStart))
+                {
+                    ImSearch::PopSearchable(myDisplayEnd);
+                }
+
                 ImSearch::PopSearchable();
             }
 
-            // Call Submit explicitly; all the callbacks
-            // will be invoked through submit. If we
-            // had waited for EndSearch to do this for us,
-            // the callbacks would've been invoked after
-            // ImGui::EndChild, leaving our searchables
-            // to be displayed outside of the child window.
-            ImSearch::Submit();
-        } ImGui::EndChild();
 
-        ImGui::PopStyleColor();
-        ImSearch::EndSearch();
+
+#ifdef HAS_CPP14 // C++11 didnt support lambda captures by value. 
+            if (ImSearchDemo_CollapsingHeader("Lambdas and captures"))
+        	{
+                const std::string tooltip = GetRandomString(seed, str);
+                if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                    // You can capture anything in the lambda you might need.
+                    // The easiest way, works with any C++ lambda.
+                    [=](const char* str)
+                    {
+                        ImGui::TextUnformatted(str);
+
+                        if (ImGui::BeginItemTooltip())
+                        {
+                            ImGui::TextUnformatted(tooltip.c_str());
+                            ImGui::EndTooltip();
+                        }
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                ImSearch::PopSearchable();
+            }
+#endif
+
+            if (ImSearchDemo_CollapsingHeader("Free functions"))
+            {
+            	// C++ may sometimes require you to cast, to avoid ambiguity between different overloads.
+                if (ImSearch::PushSearchable("Tree", static_cast<bool(*)(const char* label)>(&ImGui::TreeNode)))
+                {
+                    // Sometimes you can even use functions directly from ImGui!
+                    ImSearch::PopSearchable(&ImGui::TreePop);
+                }
+
+                ImSearch::PopSearchable();
+            }
+
+            if (ImSearchDemo_CollapsingHeader("Common pitfall: dangling references"))
+			{
+				{
+                    int hiIWentOutOfScope{};
+
+                    if (ImSearch::PushSearchable("Undefined behaviour, variable out of scope!",
+                        [&hiIWentOutOfScope](const char* name) // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                        {                                                                                       /*^*/
+                            ImGui::TextUnformatted(name);                                                       /*^*/
+																												/*^*/
+                            // This would be invalid!                                                           /*^*/
+                            // ImGui::InputInt("DontDoThis", &hiIWentOutOfScope);                               /*^*/
+                                                                                                                /*^*/
+                        	(void)(hiIWentOutOfScope); // (just to silence warnings of it being unused			/*^*/
+                            return true;                                                                        /*^*/
+                        }))                                                                                     /*^*/
+                    {                                                                                           /*^*/
+                        ImSearch::PopSearchable();                                                              /*^*/
+                    }                                                                                           /*^*/
+				}                                                                                               /*^*/
+                                                                                                                /*^*/
+                ImSearch::PopSearchable();                                                                      /*^*/
+                                                                                                                /*^*/
+            	// Your callbacks can be invoked at any point between your call to PushSearchable and the next  /*^*/
+                // ImSearch::Submit or ImSearch::EndSearch is reached. Make sure your callbacks remain valid,   /*^*/
+                // with nothing dangling.                                                                       /*^*/
+				ImSearch::Submit(); // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>^
+			}
+
+            
+            ImSearch::EndSearch();
+        }
+
+        ImGui::TreePop();
+    }
+
+	if (ImGui::TreeNode("Many"))
+	{
+		if (ImSearch::BeginSearch())
+		{
+            ImGui::TextWrapped("SearchBar's can be placed anywhere between BeginSearch and EndSearch; even outside the child window");
+            ImSearch::SearchBar();
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+
+            if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
+            {
+                for (int i = 0; i < 1000; i++)
+                {
+                    if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                        [](const char* str)
+                        {
+                            ImGui::TextUnformatted(str);
+                            return true;
+                        }))
+                    {
+                        ImSearch::PopSearchable();
+                    }
+                }
+
+                // Call Submit explicitly; all the callbacks
+                // will be invoked through submit. If we
+                // had waited for EndSearch to do this for us,
+                // the callbacks would've been invoked after
+                // ImGui::EndChild, leaving our searchables
+                // to be displayed outside of the child window.
+                ImSearch::Submit();
+            } ImGui::EndChild();
+
+            ImGui::PopStyleColor();
+            ImSearch::EndSearch();
+		}
+
 		ImGui::TreePop();
 	}
 
 	if (ImGui::TreeNode("Tree Nodes"))
 	{
-		ImSearch::BeginSearch();
-        ImSearch::SearchBar();
-
-        if (ImSearchDemo_TreeNode("Professions"))
+        if (ImSearch::BeginSearch())
         {
-            if (ImSearchDemo_TreeNode("Farmers"))
+            ImSearch::SearchBar();
+
+            if (ImSearchDemo_TreeNode("Professions"))
             {
-                if (ImSearchDemo_TreeNode("Tools"))
+                if (ImSearchDemo_TreeNode("Farmers"))
                 {
-                    ImSearchDemo_TreeLeaf("Hoe, for tilling soil and removing weeds.");
-                    ImSearchDemo_TreeLeaf("Sickle, for cutting crops like wheat or grass.");
-                    ImSearchDemo_TreeLeaf("Plow, for turning and loosening soil before planting.");
-                    ImSearchDemo_TreeLeaf("Wheelbarrow, for transporting soil, crops, and tools.");
-                    ImSearchDemo_TreeLeaf("Rake, for leveling soil or gathering leaves and hay.");
-                    ImSearchDemo_TreeLeaf("Pitchfork, for moving hay, compost, or manure.");
-                    ImSearchDemo_TreeLeaf("Scythe, a long-handled tool for mowing grass or reaping crops.");
-                    ImSearchDemo_TreeLeaf("Hand Trowel, for small digging jobs like planting.");
-                    ImSearchDemo_TreeLeaf("Pruning Shears, for trimming plants and branches.");
-                    ImSearchDemo_TreeLeaf("Seed Drill, for planting seeds at consistent depth and spacing.");
+                    if (ImSearchDemo_TreeNode("Tools"))
+                    {
+                        ImSearchDemo_TreeLeaf("Hoe, for tilling soil and removing weeds.");
+                        ImSearchDemo_TreeLeaf("Sickle, for cutting crops like wheat or grass.");
+                        ImSearchDemo_TreeLeaf("Plow, for turning and loosening soil before planting.");
+                        ImSearchDemo_TreeLeaf("Wheelbarrow, for transporting soil, crops, and tools.");
+                        ImSearchDemo_TreeLeaf("Rake, for leveling soil or gathering leaves and hay.");
+                        ImSearchDemo_TreeLeaf("Pitchfork, for moving hay, compost, or manure.");
+                        ImSearchDemo_TreeLeaf("Scythe, a long-handled tool for mowing grass or reaping crops.");
+                        ImSearchDemo_TreeLeaf("Hand Trowel, for small digging jobs like planting.");
+                        ImSearchDemo_TreeLeaf("Pruning Shears, for trimming plants and branches.");
+                        ImSearchDemo_TreeLeaf("Seed Drill, for planting seeds at consistent depth and spacing.");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Crops"))
+                    {
+                        ImSearchDemo_TreeLeaf("Wheat");
+                        ImSearchDemo_TreeLeaf("Corn");
+                        ImSearchDemo_TreeLeaf("Rice");
+                        ImSearchDemo_TreeLeaf("Soybeans");
+                        ImSearchDemo_TreeLeaf("Barley");
+                        ImSearchDemo_TreeLeaf("Oats");
+                        ImSearchDemo_TreeLeaf("Cotton");
+                        ImSearchDemo_TreeLeaf("Sugarcane");
+                        ImSearchDemo_TreeLeaf("Potatoes");
+                        ImSearchDemo_TreeLeaf("Tomatoes");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Livestock"))
+                    {
+                        ImSearchDemo_TreeLeaf("Cattle");
+                        ImSearchDemo_TreeLeaf("Sheep");
+                        ImSearchDemo_TreeLeaf("Goats");
+                        ImSearchDemo_TreeLeaf("Pigs");
+                        ImSearchDemo_TreeLeaf("Chickens");
+                        ImSearchDemo_TreeLeaf("Ducks");
+                        ImSearchDemo_TreeLeaf("Horses");
+                        ImSearchDemo_TreeLeaf("Bees");
+                        ImSearchDemo_TreeLeaf("Turkeys");
+                        ImSearchDemo_TreeLeaf("Llamas");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Crops"))
+
+                if (ImSearchDemo_TreeNode("Blacksmiths"))
                 {
-                    ImSearchDemo_TreeLeaf("Wheat");
-                    ImSearchDemo_TreeLeaf("Corn");
-                    ImSearchDemo_TreeLeaf("Rice");
-                    ImSearchDemo_TreeLeaf("Soybeans");
-                    ImSearchDemo_TreeLeaf("Barley");
-                    ImSearchDemo_TreeLeaf("Oats");
-                    ImSearchDemo_TreeLeaf("Cotton");
-                    ImSearchDemo_TreeLeaf("Sugarcane");
-                    ImSearchDemo_TreeLeaf("Potatoes");
-                    ImSearchDemo_TreeLeaf("Tomatoes");
+                    if (ImSearchDemo_TreeNode("Tools"))
+                    {
+                        ImSearchDemo_TreeLeaf("Hammer");
+                        ImSearchDemo_TreeLeaf("Anvil");
+                        ImSearchDemo_TreeLeaf("Tongs");
+                        ImSearchDemo_TreeLeaf("Forge");
+                        ImSearchDemo_TreeLeaf("Quenching Tank");
+                        ImSearchDemo_TreeLeaf("Files");
+                        ImSearchDemo_TreeLeaf("Chisels");
+                        ImSearchDemo_TreeLeaf("Punches");
+                        ImSearchDemo_TreeLeaf("Swage Block");
+                        ImSearchDemo_TreeLeaf("Bellows");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Materials"))
+                    {
+                        ImSearchDemo_TreeLeaf("Iron Ore");
+                        ImSearchDemo_TreeLeaf("Coal");
+                        ImSearchDemo_TreeLeaf("Charcoal");
+                        ImSearchDemo_TreeLeaf("Steel Ingots");
+                        ImSearchDemo_TreeLeaf("Copper");
+                        ImSearchDemo_TreeLeaf("Bronze");
+                        ImSearchDemo_TreeLeaf("Nickel");
+                        ImSearchDemo_TreeLeaf("Cobalt");
+                        ImSearchDemo_TreeLeaf("Manganese");
+                        ImSearchDemo_TreeLeaf("Flux");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Products"))
+                    {
+                        ImSearchDemo_TreeLeaf("Horseshoes");
+                        ImSearchDemo_TreeLeaf("Nails");
+                        ImSearchDemo_TreeLeaf("Swords");
+                        ImSearchDemo_TreeLeaf("Axes");
+                        ImSearchDemo_TreeLeaf("Armor Plates");
+                        ImSearchDemo_TreeLeaf("Tools");
+                        ImSearchDemo_TreeLeaf("Chains");
+                        ImSearchDemo_TreeLeaf("Iron Gates");
+                        ImSearchDemo_TreeLeaf("Rail Tracks");
+                        ImSearchDemo_TreeLeaf("Decorative Grills");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Livestock"))
+
+                if (ImSearchDemo_TreeNode("Fishermen"))
                 {
-                    ImSearchDemo_TreeLeaf("Cattle");
-                    ImSearchDemo_TreeLeaf("Sheep");
-                    ImSearchDemo_TreeLeaf("Goats");
-                    ImSearchDemo_TreeLeaf("Pigs");
-                    ImSearchDemo_TreeLeaf("Chickens");
-                    ImSearchDemo_TreeLeaf("Ducks");
-                    ImSearchDemo_TreeLeaf("Horses");
-                    ImSearchDemo_TreeLeaf("Bees");
-                    ImSearchDemo_TreeLeaf("Turkeys");
-                    ImSearchDemo_TreeLeaf("Llamas");
+                    if (ImSearchDemo_TreeNode("Equipment"))
+                    {
+                        ImSearchDemo_TreeLeaf("Fishing Rod");
+                        ImSearchDemo_TreeLeaf("Net");
+                        ImSearchDemo_TreeLeaf("Tackle Box");
+                        ImSearchDemo_TreeLeaf("Hooks");
+                        ImSearchDemo_TreeLeaf("Lures");
+                        ImSearchDemo_TreeLeaf("Bobbers");
+                        ImSearchDemo_TreeLeaf("Sinkers");
+                        ImSearchDemo_TreeLeaf("Gaff");
+                        ImSearchDemo_TreeLeaf("Gill Net");
+                        ImSearchDemo_TreeLeaf("Crab Pot");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Catch"))
+                    {
+                        ImSearchDemo_TreeLeaf("Salmon");
+                        ImSearchDemo_TreeLeaf("Tuna");
+                        ImSearchDemo_TreeLeaf("Trout");
+                        ImSearchDemo_TreeLeaf("Cod");
+                        ImSearchDemo_TreeLeaf("Haddock");
+                        ImSearchDemo_TreeLeaf("Shrimp");
+                        ImSearchDemo_TreeLeaf("Crab");
+                        ImSearchDemo_TreeLeaf("Lobster");
+                        ImSearchDemo_TreeLeaf("Sardines");
+                        ImSearchDemo_TreeLeaf("Mussels");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Boats"))
+                    {
+                        ImSearchDemo_TreeLeaf("Rowboat");
+                        ImSearchDemo_TreeLeaf("Sailboat");
+                        ImSearchDemo_TreeLeaf("Trawler");
+                        ImSearchDemo_TreeLeaf("Catamaran");
+                        ImSearchDemo_TreeLeaf("Kayak");
+                        ImSearchDemo_TreeLeaf("Dinghy");
+                        ImSearchDemo_TreeLeaf("Canoe");
+                        ImSearchDemo_TreeLeaf("Fishing Trawler");
+                        ImSearchDemo_TreeLeaf("Longliner");
+                        ImSearchDemo_TreeLeaf("Gillnetter");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
+
                 ImSearchDemo_TreePop();
             }
 
-            if (ImSearchDemo_TreeNode("Blacksmiths"))
+            if (ImSearchDemo_TreeNode("Technologies"))
             {
-                if (ImSearchDemo_TreeNode("Tools"))
+                if (ImSearchDemo_TreeNode("Computers"))
                 {
-                    ImSearchDemo_TreeLeaf("Hammer");
-                    ImSearchDemo_TreeLeaf("Anvil");
-                    ImSearchDemo_TreeLeaf("Tongs");
-                    ImSearchDemo_TreeLeaf("Forge");
-                    ImSearchDemo_TreeLeaf("Quenching Tank");
-                    ImSearchDemo_TreeLeaf("Files");
-                    ImSearchDemo_TreeLeaf("Chisels");
-                    ImSearchDemo_TreeLeaf("Punches");
-                    ImSearchDemo_TreeLeaf("Swage Block");
-                    ImSearchDemo_TreeLeaf("Bellows");
+                    if (ImSearchDemo_TreeNode("Hardware"))
+                    {
+                        ImSearchDemo_TreeLeaf("CPU");
+                        ImSearchDemo_TreeLeaf("GPU");
+                        ImSearchDemo_TreeLeaf("RAM");
+                        ImSearchDemo_TreeLeaf("Motherboard");
+                        ImSearchDemo_TreeLeaf("SSD");
+                        ImSearchDemo_TreeLeaf("HDD");
+                        ImSearchDemo_TreeLeaf("Power Supply");
+                        ImSearchDemo_TreeLeaf("Cooler");
+                        ImSearchDemo_TreeLeaf("Case");
+                        ImSearchDemo_TreeLeaf("Network Card");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Software"))
+                    {
+                        ImSearchDemo_TreeLeaf("Operating System");
+                        ImSearchDemo_TreeLeaf("Web Browser");
+                        ImSearchDemo_TreeLeaf("Office Suite");
+                        ImSearchDemo_TreeLeaf("IDE");
+                        ImSearchDemo_TreeLeaf("Antivirus");
+                        ImSearchDemo_TreeLeaf("Drivers");
+                        ImSearchDemo_TreeLeaf("Database");
+                        ImSearchDemo_TreeLeaf("Virtual Machine");
+                        ImSearchDemo_TreeLeaf("Compiler");
+                        ImSearchDemo_TreeLeaf("Text Editor");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Networking"))
+                    {
+                        ImSearchDemo_TreeLeaf("Router");
+                        ImSearchDemo_TreeLeaf("Switch");
+                        ImSearchDemo_TreeLeaf("Firewall");
+                        ImSearchDemo_TreeLeaf("Modem");
+                        ImSearchDemo_TreeLeaf("Access Point");
+                        ImSearchDemo_TreeLeaf("Ethernet Cable");
+                        ImSearchDemo_TreeLeaf("Fiber Optic Cable");
+                        ImSearchDemo_TreeLeaf("VPN");
+                        ImSearchDemo_TreeLeaf("DNS");
+                        ImSearchDemo_TreeLeaf("DHCP");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Materials"))
+
+                if (ImSearchDemo_TreeNode("Vehicles"))
                 {
-                    ImSearchDemo_TreeLeaf("Iron Ore");
-                    ImSearchDemo_TreeLeaf("Coal");
-                    ImSearchDemo_TreeLeaf("Charcoal");
-                    ImSearchDemo_TreeLeaf("Steel Ingots");
-                    ImSearchDemo_TreeLeaf("Copper");
-                    ImSearchDemo_TreeLeaf("Bronze");
-                    ImSearchDemo_TreeLeaf("Nickel");
-                    ImSearchDemo_TreeLeaf("Cobalt");
-                    ImSearchDemo_TreeLeaf("Manganese");
-                    ImSearchDemo_TreeLeaf("Flux");
+                    if (ImSearchDemo_TreeNode("Land"))
+                    {
+                        ImSearchDemo_TreeLeaf("Car");
+                        ImSearchDemo_TreeLeaf("Truck");
+                        ImSearchDemo_TreeLeaf("Motorcycle");
+                        ImSearchDemo_TreeLeaf("Bicycle");
+                        ImSearchDemo_TreeLeaf("Bus");
+                        ImSearchDemo_TreeLeaf("Train");
+                        ImSearchDemo_TreeLeaf("Tram");
+                        ImSearchDemo_TreeLeaf("Tank");
+                        ImSearchDemo_TreeLeaf("ATV");
+                        ImSearchDemo_TreeLeaf("Segway");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Air"))
+                    {
+                        ImSearchDemo_TreeLeaf("Airplane");
+                        ImSearchDemo_TreeLeaf("Helicopter");
+                        ImSearchDemo_TreeLeaf("Drone");
+                        ImSearchDemo_TreeLeaf("Glider");
+                        ImSearchDemo_TreeLeaf("Hot Air Balloon");
+                        ImSearchDemo_TreeLeaf("Jet");
+                        ImSearchDemo_TreeLeaf("Blimp");
+                        ImSearchDemo_TreeLeaf("Autogyro");
+                        ImSearchDemo_TreeLeaf("Seaplane");
+                        ImSearchDemo_TreeLeaf("Hang Glider");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Sea"))
+                    {
+                        ImSearchDemo_TreeLeaf("Ship");
+                        ImSearchDemo_TreeLeaf("Boat");
+                        ImSearchDemo_TreeLeaf("Submarine");
+                        ImSearchDemo_TreeLeaf("Yacht");
+                        ImSearchDemo_TreeLeaf("Canoe");
+                        ImSearchDemo_TreeLeaf("Ferry");
+                        ImSearchDemo_TreeLeaf("Sailboat");
+                        ImSearchDemo_TreeLeaf("Tugboat");
+                        ImSearchDemo_TreeLeaf("Catamaran");
+                        ImSearchDemo_TreeLeaf("Dinghy");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Products"))
-                {
-                    ImSearchDemo_TreeLeaf("Horseshoes");
-                    ImSearchDemo_TreeLeaf("Nails");
-                    ImSearchDemo_TreeLeaf("Swords");
-                    ImSearchDemo_TreeLeaf("Axes");
-                    ImSearchDemo_TreeLeaf("Armor Plates");
-                    ImSearchDemo_TreeLeaf("Tools");
-                    ImSearchDemo_TreeLeaf("Chains");
-                    ImSearchDemo_TreeLeaf("Iron Gates");
-                    ImSearchDemo_TreeLeaf("Rail Tracks");
-                    ImSearchDemo_TreeLeaf("Decorative Grills");
-                    ImSearchDemo_TreePop();
-                }
+
                 ImSearchDemo_TreePop();
             }
 
-            if (ImSearchDemo_TreeNode("Fishermen"))
+            if (ImSearchDemo_TreeNode("Nature"))
             {
-                if (ImSearchDemo_TreeNode("Equipment"))
+                if (ImSearchDemo_TreeNode("Animals"))
                 {
-                    ImSearchDemo_TreeLeaf("Fishing Rod");
-                    ImSearchDemo_TreeLeaf("Net");
-                    ImSearchDemo_TreeLeaf("Tackle Box");
-                    ImSearchDemo_TreeLeaf("Hooks");
-                    ImSearchDemo_TreeLeaf("Lures");
-                    ImSearchDemo_TreeLeaf("Bobbers");
-                    ImSearchDemo_TreeLeaf("Sinkers");
-                    ImSearchDemo_TreeLeaf("Gaff");
-                    ImSearchDemo_TreeLeaf("Gill Net");
-                    ImSearchDemo_TreeLeaf("Crab Pot");
+                    if (ImSearchDemo_TreeNode("Mammals"))
+                    {
+                        ImSearchDemo_TreeLeaf("Lion");
+                        ImSearchDemo_TreeLeaf("Tiger");
+                        ImSearchDemo_TreeLeaf("Elephant");
+                        ImSearchDemo_TreeLeaf("Whale");
+                        ImSearchDemo_TreeLeaf("Dolphin");
+                        ImSearchDemo_TreeLeaf("Bat");
+                        ImSearchDemo_TreeLeaf("Kangaroo");
+                        ImSearchDemo_TreeLeaf("Human");
+                        ImSearchDemo_TreeLeaf("Bear");
+                        ImSearchDemo_TreeLeaf("Wolf");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Birds"))
+                    {
+                        ImSearchDemo_TreeLeaf("Eagle");
+                        ImSearchDemo_TreeLeaf("Sparrow");
+                        ImSearchDemo_TreeLeaf("Penguin");
+                        ImSearchDemo_TreeLeaf("Owl");
+                        ImSearchDemo_TreeLeaf("Parrot");
+                        ImSearchDemo_TreeLeaf("Flamingo");
+                        ImSearchDemo_TreeLeaf("Duck");
+                        ImSearchDemo_TreeLeaf("Goose");
+                        ImSearchDemo_TreeLeaf("Hawk");
+                        ImSearchDemo_TreeLeaf("Crow");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Reptiles"))
+                    {
+                        ImSearchDemo_TreeLeaf("Crocodile");
+                        ImSearchDemo_TreeLeaf("Snake");
+                        ImSearchDemo_TreeLeaf("Lizard");
+                        ImSearchDemo_TreeLeaf("Turtle");
+                        ImSearchDemo_TreeLeaf("Chameleon");
+                        ImSearchDemo_TreeLeaf("Gecko");
+                        ImSearchDemo_TreeLeaf("Alligator");
+                        ImSearchDemo_TreeLeaf("Komodo Dragon");
+                        ImSearchDemo_TreeLeaf("Iguana");
+                        ImSearchDemo_TreeLeaf("Rattlesnake");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Catch"))
+                if (ImSearchDemo_TreeNode("Plants"))
                 {
-                    ImSearchDemo_TreeLeaf("Salmon");
-                    ImSearchDemo_TreeLeaf("Tuna");
-                    ImSearchDemo_TreeLeaf("Trout");
-                    ImSearchDemo_TreeLeaf("Cod");
-                    ImSearchDemo_TreeLeaf("Haddock");
-                    ImSearchDemo_TreeLeaf("Shrimp");
-                    ImSearchDemo_TreeLeaf("Crab");
-                    ImSearchDemo_TreeLeaf("Lobster");
-                    ImSearchDemo_TreeLeaf("Sardines");
-                    ImSearchDemo_TreeLeaf("Mussels");
+                    if (ImSearchDemo_TreeNode("Trees"))
+                    {
+                        ImSearchDemo_TreeLeaf("Oak");
+                        ImSearchDemo_TreeLeaf("Pine");
+                        ImSearchDemo_TreeLeaf("Maple");
+                        ImSearchDemo_TreeLeaf("Birch");
+                        ImSearchDemo_TreeLeaf("Cedar");
+                        ImSearchDemo_TreeLeaf("Redwood");
+                        ImSearchDemo_TreeLeaf("Palm");
+                        ImSearchDemo_TreeLeaf("Willow");
+                        ImSearchDemo_TreeLeaf("Spruce");
+                        ImSearchDemo_TreeLeaf("Cypress");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Flowers"))
+                    {
+                        ImSearchDemo_TreeLeaf("Rose");
+                        ImSearchDemo_TreeLeaf("Tulip");
+                        ImSearchDemo_TreeLeaf("Sunflower");
+                        ImSearchDemo_TreeLeaf("Daisy");
+                        ImSearchDemo_TreeLeaf("Orchid");
+                        ImSearchDemo_TreeLeaf("Lily");
+                        ImSearchDemo_TreeLeaf("Marigold");
+                        ImSearchDemo_TreeLeaf("Daffodil");
+                        ImSearchDemo_TreeLeaf("Chrysanthemum");
+                        ImSearchDemo_TreeLeaf("Iris");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Fungi"))
+                    {
+                        ImSearchDemo_TreeLeaf("Button Mushroom");
+                        ImSearchDemo_TreeLeaf("Shiitake");
+                        ImSearchDemo_TreeLeaf("Oyster Mushroom");
+                        ImSearchDemo_TreeLeaf("Morel");
+                        ImSearchDemo_TreeLeaf("Chanterelle");
+                        ImSearchDemo_TreeLeaf("Truffle");
+                        ImSearchDemo_TreeLeaf("Fly Agaric");
+                        ImSearchDemo_TreeLeaf("Porcini");
+                        ImSearchDemo_TreeLeaf("Puffball");
+                        ImSearchDemo_TreeLeaf("Enoki");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
-                if (ImSearchDemo_TreeNode("Boats"))
+
+                ImSearchDemo_TreePop();
+            }
+            if (ImSearchDemo_TreeNode("Culinary"))
+            {
+                if (ImSearchDemo_TreeNode("Ingredients"))
                 {
-                    ImSearchDemo_TreeLeaf("Rowboat");
-                    ImSearchDemo_TreeLeaf("Sailboat");
-                    ImSearchDemo_TreeLeaf("Trawler");
-                    ImSearchDemo_TreeLeaf("Catamaran");
-                    ImSearchDemo_TreeLeaf("Kayak");
-                    ImSearchDemo_TreeLeaf("Dinghy");
-                    ImSearchDemo_TreeLeaf("Canoe");
-                    ImSearchDemo_TreeLeaf("Fishing Trawler");
-                    ImSearchDemo_TreeLeaf("Longliner");
-                    ImSearchDemo_TreeLeaf("Gillnetter");
+                    if (ImSearchDemo_TreeNode("Spices"))
+                    {
+                        ImSearchDemo_TreeLeaf("Salt");
+                        ImSearchDemo_TreeLeaf("Pepper");
+                        ImSearchDemo_TreeLeaf("Paprika");
+                        ImSearchDemo_TreeLeaf("Cumin");
+                        ImSearchDemo_TreeLeaf("Turmeric");
+                        ImSearchDemo_TreeLeaf("Oregano");
+                        ImSearchDemo_TreeLeaf("Basil");
+                        ImSearchDemo_TreeLeaf("Thyme");
+                        ImSearchDemo_TreeLeaf("Cinnamon");
+                        ImSearchDemo_TreeLeaf("Nutmeg");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Produce"))
+                    {
+                        ImSearchDemo_TreeLeaf("Carrot");
+                        ImSearchDemo_TreeLeaf("Onion");
+                        ImSearchDemo_TreeLeaf("Garlic");
+                        ImSearchDemo_TreeLeaf("Pepper");
+                        ImSearchDemo_TreeLeaf("Tomato");
+                        ImSearchDemo_TreeLeaf("Lettuce");
+                        ImSearchDemo_TreeLeaf("Spinach");
+                        ImSearchDemo_TreeLeaf("Broccoli");
+                        ImSearchDemo_TreeLeaf("Eggplant");
+                        ImSearchDemo_TreeLeaf("Zucchini");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Proteins"))
+                    {
+                        ImSearchDemo_TreeLeaf("Chicken");
+                        ImSearchDemo_TreeLeaf("Beef");
+                        ImSearchDemo_TreeLeaf("Pork");
+                        ImSearchDemo_TreeLeaf("Tofu");
+                        ImSearchDemo_TreeLeaf("Lentils");
+                        ImSearchDemo_TreeLeaf("Fish");
+                        ImSearchDemo_TreeLeaf("Eggs");
+                        ImSearchDemo_TreeLeaf("Beans");
+                        ImSearchDemo_TreeLeaf("Lamb");
+                        ImSearchDemo_TreeLeaf("Turkey");
+                        ImSearchDemo_TreePop();
+                    }
                     ImSearchDemo_TreePop();
                 }
+                if (ImSearchDemo_TreeNode("Recipes"))
+                {
+                    if (ImSearchDemo_TreeNode("Soups"))
+                    {
+                        ImSearchDemo_TreeLeaf("Chicken Noodle Soup");
+                        ImSearchDemo_TreeLeaf("Tomato Soup");
+                        ImSearchDemo_TreeLeaf("Miso Soup");
+                        ImSearchDemo_TreeLeaf("Minestrone");
+                        ImSearchDemo_TreeLeaf("Clam Chowder");
+                        ImSearchDemo_TreeLeaf("Pho");
+                        ImSearchDemo_TreeLeaf("Ramen");
+                        ImSearchDemo_TreeLeaf("Gazpacho");
+                        ImSearchDemo_TreeLeaf("Pumpkin Soup");
+                        ImSearchDemo_TreeLeaf("Lentil Soup");
+                        ImSearchDemo_TreePop();
+                    }
+                    if (ImSearchDemo_TreeNode("Desserts"))
+                    {
+                        ImSearchDemo_TreeLeaf("Chocolate Cake");
+                        ImSearchDemo_TreeLeaf("Apple Pie");
+                        ImSearchDemo_TreeLeaf("Ice Cream");
+                        ImSearchDemo_TreeLeaf("Brownies");
+                        ImSearchDemo_TreeLeaf("Cheesecake");
+                        ImSearchDemo_TreeLeaf("Pudding");
+                        ImSearchDemo_TreeLeaf("Tiramisu");
+                        ImSearchDemo_TreeLeaf("Crepes");
+                        ImSearchDemo_TreeLeaf("Cupcakes");
+                        ImSearchDemo_TreeLeaf("Macarons");
+                        ImSearchDemo_TreePop();
+                    }
+                    ImSearchDemo_TreePop();
+                }
+
                 ImSearchDemo_TreePop();
             }
 
-            ImSearchDemo_TreePop();
+            ImSearch::EndSearch();
         }
 
-        if (ImSearchDemo_TreeNode("Technologies"))
-        {
-            if (ImSearchDemo_TreeNode("Computers"))
-            {
-                if (ImSearchDemo_TreeNode("Hardware"))
-                {
-                    ImSearchDemo_TreeLeaf("CPU");
-                    ImSearchDemo_TreeLeaf("GPU");
-                    ImSearchDemo_TreeLeaf("RAM");
-                    ImSearchDemo_TreeLeaf("Motherboard");
-                    ImSearchDemo_TreeLeaf("SSD");
-                    ImSearchDemo_TreeLeaf("HDD");
-                    ImSearchDemo_TreeLeaf("Power Supply");
-                    ImSearchDemo_TreeLeaf("Cooler");
-                    ImSearchDemo_TreeLeaf("Case");
-                    ImSearchDemo_TreeLeaf("Network Card");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Software"))
-                {
-                    ImSearchDemo_TreeLeaf("Operating System");
-                    ImSearchDemo_TreeLeaf("Web Browser");
-                    ImSearchDemo_TreeLeaf("Office Suite");
-                    ImSearchDemo_TreeLeaf("IDE");
-                    ImSearchDemo_TreeLeaf("Antivirus");
-                    ImSearchDemo_TreeLeaf("Drivers");
-                    ImSearchDemo_TreeLeaf("Database");
-                    ImSearchDemo_TreeLeaf("Virtual Machine");
-                    ImSearchDemo_TreeLeaf("Compiler");
-                    ImSearchDemo_TreeLeaf("Text Editor");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Networking"))
-                {
-                    ImSearchDemo_TreeLeaf("Router");
-                    ImSearchDemo_TreeLeaf("Switch");
-                    ImSearchDemo_TreeLeaf("Firewall");
-                    ImSearchDemo_TreeLeaf("Modem");
-                    ImSearchDemo_TreeLeaf("Access Point");
-                    ImSearchDemo_TreeLeaf("Ethernet Cable");
-                    ImSearchDemo_TreeLeaf("Fiber Optic Cable");
-                    ImSearchDemo_TreeLeaf("VPN");
-                    ImSearchDemo_TreeLeaf("DNS");
-                    ImSearchDemo_TreeLeaf("DHCP");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-
-            if (ImSearchDemo_TreeNode("Vehicles"))
-            {
-                if (ImSearchDemo_TreeNode("Land"))
-                {
-                    ImSearchDemo_TreeLeaf("Car");
-                    ImSearchDemo_TreeLeaf("Truck");
-                    ImSearchDemo_TreeLeaf("Motorcycle");
-                    ImSearchDemo_TreeLeaf("Bicycle");
-                    ImSearchDemo_TreeLeaf("Bus");
-                    ImSearchDemo_TreeLeaf("Train");
-                    ImSearchDemo_TreeLeaf("Tram");
-                    ImSearchDemo_TreeLeaf("Tank");
-                    ImSearchDemo_TreeLeaf("ATV");
-                    ImSearchDemo_TreeLeaf("Segway");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Air"))
-                {
-                    ImSearchDemo_TreeLeaf("Airplane");
-                    ImSearchDemo_TreeLeaf("Helicopter");
-                    ImSearchDemo_TreeLeaf("Drone");
-                    ImSearchDemo_TreeLeaf("Glider");
-                    ImSearchDemo_TreeLeaf("Hot Air Balloon");
-                    ImSearchDemo_TreeLeaf("Jet");
-                    ImSearchDemo_TreeLeaf("Blimp");
-                    ImSearchDemo_TreeLeaf("Autogyro");
-                    ImSearchDemo_TreeLeaf("Seaplane");
-                    ImSearchDemo_TreeLeaf("Hang Glider");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Sea"))
-                {
-                    ImSearchDemo_TreeLeaf("Ship");
-                    ImSearchDemo_TreeLeaf("Boat");
-                    ImSearchDemo_TreeLeaf("Submarine");
-                    ImSearchDemo_TreeLeaf("Yacht");
-                    ImSearchDemo_TreeLeaf("Canoe");
-                    ImSearchDemo_TreeLeaf("Ferry");
-                    ImSearchDemo_TreeLeaf("Sailboat");
-                    ImSearchDemo_TreeLeaf("Tugboat");
-                    ImSearchDemo_TreeLeaf("Catamaran");
-                    ImSearchDemo_TreeLeaf("Dinghy");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-
-            ImSearchDemo_TreePop();
-        }
-
-        if (ImSearchDemo_TreeNode("Nature"))
-        {
-            if (ImSearchDemo_TreeNode("Animals"))
-            {
-                if (ImSearchDemo_TreeNode("Mammals"))
-                {
-                    ImSearchDemo_TreeLeaf("Lion");
-                    ImSearchDemo_TreeLeaf("Tiger");
-                    ImSearchDemo_TreeLeaf("Elephant");
-                    ImSearchDemo_TreeLeaf("Whale");
-                    ImSearchDemo_TreeLeaf("Dolphin");
-                    ImSearchDemo_TreeLeaf("Bat");
-                    ImSearchDemo_TreeLeaf("Kangaroo");
-                    ImSearchDemo_TreeLeaf("Human");
-                    ImSearchDemo_TreeLeaf("Bear");
-                    ImSearchDemo_TreeLeaf("Wolf");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Birds"))
-                {
-                    ImSearchDemo_TreeLeaf("Eagle");
-                    ImSearchDemo_TreeLeaf("Sparrow");
-                    ImSearchDemo_TreeLeaf("Penguin");
-                    ImSearchDemo_TreeLeaf("Owl");
-                    ImSearchDemo_TreeLeaf("Parrot");
-                    ImSearchDemo_TreeLeaf("Flamingo");
-                    ImSearchDemo_TreeLeaf("Duck");
-                    ImSearchDemo_TreeLeaf("Goose");
-                    ImSearchDemo_TreeLeaf("Hawk");
-                    ImSearchDemo_TreeLeaf("Crow");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Reptiles"))
-                {
-                    ImSearchDemo_TreeLeaf("Crocodile");
-                    ImSearchDemo_TreeLeaf("Snake");
-                    ImSearchDemo_TreeLeaf("Lizard");
-                    ImSearchDemo_TreeLeaf("Turtle");
-                    ImSearchDemo_TreeLeaf("Chameleon");
-                    ImSearchDemo_TreeLeaf("Gecko");
-                    ImSearchDemo_TreeLeaf("Alligator");
-                    ImSearchDemo_TreeLeaf("Komodo Dragon");
-                    ImSearchDemo_TreeLeaf("Iguana");
-                    ImSearchDemo_TreeLeaf("Rattlesnake");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-        	if (ImSearchDemo_TreeNode("Plants"))
-            {
-                if (ImSearchDemo_TreeNode("Trees"))
-                {
-                    ImSearchDemo_TreeLeaf("Oak");
-                    ImSearchDemo_TreeLeaf("Pine");
-                    ImSearchDemo_TreeLeaf("Maple");
-                    ImSearchDemo_TreeLeaf("Birch");
-                    ImSearchDemo_TreeLeaf("Cedar");
-                    ImSearchDemo_TreeLeaf("Redwood");
-                    ImSearchDemo_TreeLeaf("Palm");
-                    ImSearchDemo_TreeLeaf("Willow");
-                    ImSearchDemo_TreeLeaf("Spruce");
-                    ImSearchDemo_TreeLeaf("Cypress");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Flowers"))
-                {
-                    ImSearchDemo_TreeLeaf("Rose");
-                    ImSearchDemo_TreeLeaf("Tulip");
-                    ImSearchDemo_TreeLeaf("Sunflower");
-                    ImSearchDemo_TreeLeaf("Daisy");
-                    ImSearchDemo_TreeLeaf("Orchid");
-                    ImSearchDemo_TreeLeaf("Lily");
-                    ImSearchDemo_TreeLeaf("Marigold");
-                    ImSearchDemo_TreeLeaf("Daffodil");
-                    ImSearchDemo_TreeLeaf("Chrysanthemum");
-                    ImSearchDemo_TreeLeaf("Iris");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Fungi"))
-                {
-                    ImSearchDemo_TreeLeaf("Button Mushroom");
-                    ImSearchDemo_TreeLeaf("Shiitake");
-                    ImSearchDemo_TreeLeaf("Oyster Mushroom");
-                    ImSearchDemo_TreeLeaf("Morel");
-                    ImSearchDemo_TreeLeaf("Chanterelle");
-                    ImSearchDemo_TreeLeaf("Truffle");
-                    ImSearchDemo_TreeLeaf("Fly Agaric");
-                    ImSearchDemo_TreeLeaf("Porcini");
-                    ImSearchDemo_TreeLeaf("Puffball");
-                    ImSearchDemo_TreeLeaf("Enoki");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-
-            ImSearchDemo_TreePop();
-        }
-		if (ImSearchDemo_TreeNode("Culinary"))
-        {
-            if (ImSearchDemo_TreeNode("Ingredients"))
-            {
-                if (ImSearchDemo_TreeNode("Spices"))
-                {
-                    ImSearchDemo_TreeLeaf("Salt");
-                    ImSearchDemo_TreeLeaf("Pepper");
-                    ImSearchDemo_TreeLeaf("Paprika");
-                    ImSearchDemo_TreeLeaf("Cumin");
-                    ImSearchDemo_TreeLeaf("Turmeric");
-                    ImSearchDemo_TreeLeaf("Oregano");
-                    ImSearchDemo_TreeLeaf("Basil");
-                    ImSearchDemo_TreeLeaf("Thyme");
-                    ImSearchDemo_TreeLeaf("Cinnamon");
-                    ImSearchDemo_TreeLeaf("Nutmeg");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Produce"))
-                {
-                    ImSearchDemo_TreeLeaf("Carrot");
-                    ImSearchDemo_TreeLeaf("Onion");
-                    ImSearchDemo_TreeLeaf("Garlic");
-                    ImSearchDemo_TreeLeaf("Pepper");
-                    ImSearchDemo_TreeLeaf("Tomato");
-                    ImSearchDemo_TreeLeaf("Lettuce");
-                    ImSearchDemo_TreeLeaf("Spinach");
-                    ImSearchDemo_TreeLeaf("Broccoli");
-                    ImSearchDemo_TreeLeaf("Eggplant");
-                    ImSearchDemo_TreeLeaf("Zucchini");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Proteins"))
-                {
-                    ImSearchDemo_TreeLeaf("Chicken");
-                    ImSearchDemo_TreeLeaf("Beef");
-                    ImSearchDemo_TreeLeaf("Pork");
-                    ImSearchDemo_TreeLeaf("Tofu");
-                    ImSearchDemo_TreeLeaf("Lentils");
-                    ImSearchDemo_TreeLeaf("Fish");
-                    ImSearchDemo_TreeLeaf("Eggs");
-                    ImSearchDemo_TreeLeaf("Beans");
-                    ImSearchDemo_TreeLeaf("Lamb");
-                    ImSearchDemo_TreeLeaf("Turkey");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-			if (ImSearchDemo_TreeNode("Recipes"))
-            {
-                if (ImSearchDemo_TreeNode("Soups"))
-                {
-                    ImSearchDemo_TreeLeaf("Chicken Noodle Soup");
-                    ImSearchDemo_TreeLeaf("Tomato Soup");
-                    ImSearchDemo_TreeLeaf("Miso Soup");
-                    ImSearchDemo_TreeLeaf("Minestrone");
-                    ImSearchDemo_TreeLeaf("Clam Chowder");
-                    ImSearchDemo_TreeLeaf("Pho");
-                    ImSearchDemo_TreeLeaf("Ramen");
-                    ImSearchDemo_TreeLeaf("Gazpacho");
-                    ImSearchDemo_TreeLeaf("Pumpkin Soup");
-                    ImSearchDemo_TreeLeaf("Lentil Soup");
-                    ImSearchDemo_TreePop();
-                }
-                if (ImSearchDemo_TreeNode("Desserts"))
-                {
-                    ImSearchDemo_TreeLeaf("Chocolate Cake");
-                    ImSearchDemo_TreeLeaf("Apple Pie");
-                    ImSearchDemo_TreeLeaf("Ice Cream");
-                    ImSearchDemo_TreeLeaf("Brownies");
-                    ImSearchDemo_TreeLeaf("Cheesecake");
-                    ImSearchDemo_TreeLeaf("Pudding");
-                    ImSearchDemo_TreeLeaf("Tiramisu");
-                    ImSearchDemo_TreeLeaf("Crepes");
-                    ImSearchDemo_TreeLeaf("Cupcakes");
-                    ImSearchDemo_TreeLeaf("Macarons");
-                    ImSearchDemo_TreePop();
-                }
-                ImSearchDemo_TreePop();
-            }
-
-            ImSearchDemo_TreePop();
-        }
-
-		ImSearch::EndSearch();
 		ImGui::TreePop();
 	}
+
+    if (ImGui::TreeNode("Collapsing headers"))
+    {
+        if (ImSearch::BeginSearch())
+        {
+            ImSearch::SearchBar();
+
+            if (ImSearchDemo_CollapsingHeader("TransformComponent"))
+            {
+                if (ImSearch::PushSearchable("Position",
+                    [](const char* name)
+                    {
+                        static float v[3]{};
+                        ImGui::InputFloat3(name, v);
+                        return true;
+                    }))
+                {
+	                ImSearch::PopSearchable();
+                }
+
+                if (ImSearch::PushSearchable("Scale",
+                    [](const char* name)
+                    {
+                        static float v[3]{};
+                        ImGui::InputFloat3(name, v);
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                if (ImSearch::PushSearchable("Orientation",
+                    [](const char* name)
+                    {
+                        static float v[3]{};
+                        ImGui::InputFloat3(name, v);
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                ImSearch::PopSearchable();
+            }
+
+            if (ImSearchDemo_CollapsingHeader("StaticMeshComponent"))
+            {
+                if (ImSearch::PushSearchable("Mesh",
+                    [](const char* name)
+                    {
+                        static const char* selectedString = nouns[0];
+                        if (ImGui::BeginCombo(name, selectedString))
+                        {
+                            if (ImSearch::BeginSearch())
+                            {
+                                ImSearch::SearchBar();
+                                for (const char* noun : nouns)
+                                {
+                                    if (ImSearch::PushSearchable(noun,
+                                        [&](const char* name)
+                                        {
+                                            const bool isSelected = name == selectedString;
+                                            if (ImGui::Selectable(name, isSelected))
+                                            {
+                                                selectedString = name;
+                                            }
+                                            return true;
+                                        }))
+                                    {
+                                        ImSearch::PopSearchable();
+                                    }
+                                }
+
+                                ImSearch::EndSearch();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                ImSearch::PopSearchable();
+            }
+
+        	if (ImSearchDemo_CollapsingHeader("PhysicsBodyComponent"))
+            {
+                if (ImSearch::PushSearchable("Mass",
+                    [](const char* name)
+                    {
+                        static float v{};
+                        ImGui::InputFloat(name, &v);
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                if (ImSearch::PushSearchable("Collision Enabled",
+                    [](const char* name)
+                    {
+                        static bool b{};
+                        ImGui::Checkbox(name, &b);
+                        return true;
+                    }))
+                {
+                    ImSearch::PopSearchable();
+                }
+
+                ImSearch::PopSearchable();
+            }
+
+            ImSearch::EndSearch();
+        }
+
+        ImGui::TreePop();
+    }
 
 	ImGui::End();
 }
@@ -668,6 +884,18 @@ namespace
 
 		return str.c_str();
 	}
+
+    void HelpMarker(const char* desc)
+    {
+        ImGui::TextDisabled("(?)");
+        if (ImGui::BeginItemTooltip())
+        {
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted(desc);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
 
     bool ImSearchDemo_TreeNode(const char* name)
     {
@@ -696,6 +924,14 @@ namespace
             []()
             {
                 ImGui::TreePop();
+            });
+    }
+
+    bool ImSearchDemo_CollapsingHeader(const char* name)
+    {
+        return ImSearch::PushSearchable(name, [](const char* name)
+            {
+                return ImGui::CollapsingHeader(name);
             });
     }
 }
