@@ -13,6 +13,10 @@ namespace
 
 	size_t Rand(size_t& seed);
 	const char* GetRandomString(size_t& seed, std::string& str);
+
+    bool ImSearchDemo_TreeNode(const char* name);
+    void ImSearchDemo_TreeLeaf(const char* name);
+    void ImSearchDemo_TreePop();
 }
 
 void ImSearch::ShowDemoWindow(bool* p_open)
@@ -24,13 +28,12 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	}
 
 	size_t seed = static_cast<size_t>(0xbadC0ffee);
-
 	// Reuse the same string
 	// when generating random strings,
 	// to reduce heap allocations
 	std::string str{};
 
-	if (ImGui::TreeNode("Simple"))
+	if (ImGui::TreeNode("Basic"))
 	{
 		if (ImSearch::BeginSearch())
 		{
@@ -94,7 +97,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         ImGui::TreePop();
     }
 
-    if (ImGui::TreeNode("Search bar"))
+    if (ImGui::TreeNode("Custom Search bar"))
     {
         if (ImSearch::BeginSearch())
         {
@@ -174,13 +177,13 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	if (ImGui::TreeNode("Many"))
 	{
 		ImSearch::BeginSearch();
-        ImGui::TextUnformatted("SearchBar's can be placed anywhere between BeginSearch and EndSearch; even outside the child window");
+        ImGui::TextWrapped("SearchBar's can be placed anywhere between BeginSearch and EndSearch; even outside the child window");
         ImSearch::SearchBar();
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
 
         if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
         {
-            for (int i = 0; i < 100000; i++)
+            for (int i = 0; i < 1000; i++)
             {
                 ImSearch::PushSearchable(GetRandomString(seed, str),
                     [](const char* str)
@@ -205,481 +208,443 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		ImGui::TreePop();
 	}
 
-   /* if (ImGui::TreeNode("Simple hierarchy"))
-    {
-        ImSearch::BeginSearch();
-        ImSearch::SearchBar();
-
-        if (ImSearch::TreeNode("I'm the root!"))
-        {
-            if (ImSearch::TreeNode("I'm the first kid, I got children of my own:"))
-            {
-                if (ImSearch::TreeNode("Hi! I'm a kid too. Here are my kids:"))
-                {
-					ImSearch::TextUnformatted("Amzy");
-					ImSearch::TextUnformatted("Alfonso");
-					ImSearch::TextUnformatted("Kay");
-					ImSearch::TextUnformatted("Leo");
-					ImSearch::TextUnformatted("Marcin");
-					ImSearch::TextUnformatted("Nikola");
-					ImSearch::TextUnformatted("Jelle");
-					ImSearch::TextUnformatted("Orhan");
-                    ImSearch::TextUnformatted("Stez");
-                    ImSearch::TreePop();
-                }
-                ImSearch::TreePop();
-            }
-            ImSearch::TextUnformatted("I'm the second kid, I have no children :(");
-
-            ImSearch::TreePop();
-        }
-
-        ImSearch::EndSearch();
-        ImGui::TreePop();
-    }
-
-	if (ImGui::TreeNode("Large hierarchy"))
+	if (ImGui::TreeNode("Tree Nodes"))
 	{
 		ImSearch::BeginSearch();
         ImSearch::SearchBar();
 
-        if (ImSearch::TreeNode("Professions"))
+        if (ImSearchDemo_TreeNode("Professions"))
         {
-            if (ImSearch::TreeNode("Farmers"))
+            if (ImSearchDemo_TreeNode("Farmers"))
             {
-                if (ImSearch::TreeNode("Tools"))
+                if (ImSearchDemo_TreeNode("Tools"))
                 {
-                    ImSearch::TextUnformatted("Hoe, for tilling soil and removing weeds.");
-                    ImSearch::TextUnformatted("Sickle, for cutting crops like wheat or grass.");
-                    ImSearch::TextUnformatted("Plow, for turning and loosening soil before planting.");
-                    ImSearch::TextUnformatted("Wheelbarrow, for transporting soil, crops, and tools.");
-                    ImSearch::TextUnformatted("Rake, for leveling soil or gathering leaves and hay.");
-                    ImSearch::TextUnformatted("Pitchfork, for moving hay, compost, or manure.");
-                    ImSearch::TextUnformatted("Scythe, a long-handled tool for mowing grass or reaping crops.");
-                    ImSearch::TextUnformatted("Hand Trowel, for small digging jobs like planting.");
-                    ImSearch::TextUnformatted("Pruning Shears, for trimming plants and branches.");
-                    ImSearch::TextUnformatted("Seed Drill, for planting seeds at consistent depth and spacing.");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Hoe, for tilling soil and removing weeds.");
+                    ImSearchDemo_TreeLeaf("Sickle, for cutting crops like wheat or grass.");
+                    ImSearchDemo_TreeLeaf("Plow, for turning and loosening soil before planting.");
+                    ImSearchDemo_TreeLeaf("Wheelbarrow, for transporting soil, crops, and tools.");
+                    ImSearchDemo_TreeLeaf("Rake, for leveling soil or gathering leaves and hay.");
+                    ImSearchDemo_TreeLeaf("Pitchfork, for moving hay, compost, or manure.");
+                    ImSearchDemo_TreeLeaf("Scythe, a long-handled tool for mowing grass or reaping crops.");
+                    ImSearchDemo_TreeLeaf("Hand Trowel, for small digging jobs like planting.");
+                    ImSearchDemo_TreeLeaf("Pruning Shears, for trimming plants and branches.");
+                    ImSearchDemo_TreeLeaf("Seed Drill, for planting seeds at consistent depth and spacing.");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Crops"))
+                if (ImSearchDemo_TreeNode("Crops"))
                 {
-                    ImSearch::TextUnformatted("Wheat");
-                    ImSearch::TextUnformatted("Corn");
-                    ImSearch::TextUnformatted("Rice");
-                    ImSearch::TextUnformatted("Soybeans");
-                    ImSearch::TextUnformatted("Barley");
-                    ImSearch::TextUnformatted("Oats");
-                    ImSearch::TextUnformatted("Cotton");
-                    ImSearch::TextUnformatted("Sugarcane");
-                    ImSearch::TextUnformatted("Potatoes");
-                    ImSearch::TextUnformatted("Tomatoes");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Wheat");
+                    ImSearchDemo_TreeLeaf("Corn");
+                    ImSearchDemo_TreeLeaf("Rice");
+                    ImSearchDemo_TreeLeaf("Soybeans");
+                    ImSearchDemo_TreeLeaf("Barley");
+                    ImSearchDemo_TreeLeaf("Oats");
+                    ImSearchDemo_TreeLeaf("Cotton");
+                    ImSearchDemo_TreeLeaf("Sugarcane");
+                    ImSearchDemo_TreeLeaf("Potatoes");
+                    ImSearchDemo_TreeLeaf("Tomatoes");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Livestock"))
+                if (ImSearchDemo_TreeNode("Livestock"))
                 {
-                    ImSearch::TextUnformatted("Cattle");
-                    ImSearch::TextUnformatted("Sheep");
-                    ImSearch::TextUnformatted("Goats");
-                    ImSearch::TextUnformatted("Pigs");
-                    ImSearch::TextUnformatted("Chickens");
-                    ImSearch::TextUnformatted("Ducks");
-                    ImSearch::TextUnformatted("Horses");
-                    ImSearch::TextUnformatted("Bees");
-                    ImSearch::TextUnformatted("Turkeys");
-                    ImSearch::TextUnformatted("Llamas");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Cattle");
+                    ImSearchDemo_TreeLeaf("Sheep");
+                    ImSearchDemo_TreeLeaf("Goats");
+                    ImSearchDemo_TreeLeaf("Pigs");
+                    ImSearchDemo_TreeLeaf("Chickens");
+                    ImSearchDemo_TreeLeaf("Ducks");
+                    ImSearchDemo_TreeLeaf("Horses");
+                    ImSearchDemo_TreeLeaf("Bees");
+                    ImSearchDemo_TreeLeaf("Turkeys");
+                    ImSearchDemo_TreeLeaf("Llamas");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            if (ImSearch::TreeNode("Blacksmiths"))
+            if (ImSearchDemo_TreeNode("Blacksmiths"))
             {
-                if (ImSearch::TreeNode("Tools"))
+                if (ImSearchDemo_TreeNode("Tools"))
                 {
-                    ImSearch::TextUnformatted("Hammer");
-                    ImSearch::TextUnformatted("Anvil");
-                    ImSearch::TextUnformatted("Tongs");
-                    ImSearch::TextUnformatted("Forge");
-                    ImSearch::TextUnformatted("Quenching Tank");
-                    ImSearch::TextUnformatted("Files");
-                    ImSearch::TextUnformatted("Chisels");
-                    ImSearch::TextUnformatted("Punches");
-                    ImSearch::TextUnformatted("Swage Block");
-                    ImSearch::TextUnformatted("Bellows");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Hammer");
+                    ImSearchDemo_TreeLeaf("Anvil");
+                    ImSearchDemo_TreeLeaf("Tongs");
+                    ImSearchDemo_TreeLeaf("Forge");
+                    ImSearchDemo_TreeLeaf("Quenching Tank");
+                    ImSearchDemo_TreeLeaf("Files");
+                    ImSearchDemo_TreeLeaf("Chisels");
+                    ImSearchDemo_TreeLeaf("Punches");
+                    ImSearchDemo_TreeLeaf("Swage Block");
+                    ImSearchDemo_TreeLeaf("Bellows");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Materials"))
+                if (ImSearchDemo_TreeNode("Materials"))
                 {
-                    ImSearch::TextUnformatted("Iron Ore");
-                    ImSearch::TextUnformatted("Coal");
-                    ImSearch::TextUnformatted("Charcoal");
-                    ImSearch::TextUnformatted("Steel Ingots");
-                    ImSearch::TextUnformatted("Copper");
-                    ImSearch::TextUnformatted("Bronze");
-                    ImSearch::TextUnformatted("Nickel");
-                    ImSearch::TextUnformatted("Cobalt");
-                    ImSearch::TextUnformatted("Manganese");
-                    ImSearch::TextUnformatted("Flux");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Iron Ore");
+                    ImSearchDemo_TreeLeaf("Coal");
+                    ImSearchDemo_TreeLeaf("Charcoal");
+                    ImSearchDemo_TreeLeaf("Steel Ingots");
+                    ImSearchDemo_TreeLeaf("Copper");
+                    ImSearchDemo_TreeLeaf("Bronze");
+                    ImSearchDemo_TreeLeaf("Nickel");
+                    ImSearchDemo_TreeLeaf("Cobalt");
+                    ImSearchDemo_TreeLeaf("Manganese");
+                    ImSearchDemo_TreeLeaf("Flux");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Products"))
+                if (ImSearchDemo_TreeNode("Products"))
                 {
-                    ImSearch::TextUnformatted("Horseshoes");
-                    ImSearch::TextUnformatted("Nails");
-                    ImSearch::TextUnformatted("Swords");
-                    ImSearch::TextUnformatted("Axes");
-                    ImSearch::TextUnformatted("Armor Plates");
-                    ImSearch::TextUnformatted("Tools");
-                    ImSearch::TextUnformatted("Chains");
-                    ImSearch::TextUnformatted("Iron Gates");
-                    ImSearch::TextUnformatted("Rail Tracks");
-                    ImSearch::TextUnformatted("Decorative Grills");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Horseshoes");
+                    ImSearchDemo_TreeLeaf("Nails");
+                    ImSearchDemo_TreeLeaf("Swords");
+                    ImSearchDemo_TreeLeaf("Axes");
+                    ImSearchDemo_TreeLeaf("Armor Plates");
+                    ImSearchDemo_TreeLeaf("Tools");
+                    ImSearchDemo_TreeLeaf("Chains");
+                    ImSearchDemo_TreeLeaf("Iron Gates");
+                    ImSearchDemo_TreeLeaf("Rail Tracks");
+                    ImSearchDemo_TreeLeaf("Decorative Grills");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            if (ImSearch::TreeNode("Fishermen"))
+            if (ImSearchDemo_TreeNode("Fishermen"))
             {
-                if (ImSearch::TreeNode("Equipment"))
+                if (ImSearchDemo_TreeNode("Equipment"))
                 {
-                    ImSearch::TextUnformatted("Fishing Rod");
-                    ImSearch::TextUnformatted("Net");
-                    ImSearch::TextUnformatted("Tackle Box");
-                    ImSearch::TextUnformatted("Hooks");
-                    ImSearch::TextUnformatted("Lures");
-                    ImSearch::TextUnformatted("Bobbers");
-                    ImSearch::TextUnformatted("Sinkers");
-                    ImSearch::TextUnformatted("Gaff");
-                    ImSearch::TextUnformatted("Gill Net");
-                    ImSearch::TextUnformatted("Crab Pot");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Fishing Rod");
+                    ImSearchDemo_TreeLeaf("Net");
+                    ImSearchDemo_TreeLeaf("Tackle Box");
+                    ImSearchDemo_TreeLeaf("Hooks");
+                    ImSearchDemo_TreeLeaf("Lures");
+                    ImSearchDemo_TreeLeaf("Bobbers");
+                    ImSearchDemo_TreeLeaf("Sinkers");
+                    ImSearchDemo_TreeLeaf("Gaff");
+                    ImSearchDemo_TreeLeaf("Gill Net");
+                    ImSearchDemo_TreeLeaf("Crab Pot");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Catch"))
+                if (ImSearchDemo_TreeNode("Catch"))
                 {
-                    ImSearch::TextUnformatted("Salmon");
-                    ImSearch::TextUnformatted("Tuna");
-                    ImSearch::TextUnformatted("Trout");
-                    ImSearch::TextUnformatted("Cod");
-                    ImSearch::TextUnformatted("Haddock");
-                    ImSearch::TextUnformatted("Shrimp");
-                    ImSearch::TextUnformatted("Crab");
-                    ImSearch::TextUnformatted("Lobster");
-                    ImSearch::TextUnformatted("Sardines");
-                    ImSearch::TextUnformatted("Mussels");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Salmon");
+                    ImSearchDemo_TreeLeaf("Tuna");
+                    ImSearchDemo_TreeLeaf("Trout");
+                    ImSearchDemo_TreeLeaf("Cod");
+                    ImSearchDemo_TreeLeaf("Haddock");
+                    ImSearchDemo_TreeLeaf("Shrimp");
+                    ImSearchDemo_TreeLeaf("Crab");
+                    ImSearchDemo_TreeLeaf("Lobster");
+                    ImSearchDemo_TreeLeaf("Sardines");
+                    ImSearchDemo_TreeLeaf("Mussels");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Boats"))
+                if (ImSearchDemo_TreeNode("Boats"))
                 {
-                    ImSearch::TextUnformatted("Rowboat");
-                    ImSearch::TextUnformatted("Sailboat");
-                    ImSearch::TextUnformatted("Trawler");
-                    ImSearch::TextUnformatted("Catamaran");
-                    ImSearch::TextUnformatted("Kayak");
-                    ImSearch::TextUnformatted("Dinghy");
-                    ImSearch::TextUnformatted("Canoe");
-                    ImSearch::TextUnformatted("Fishing Trawler");
-                    ImSearch::TextUnformatted("Longliner");
-                    ImSearch::TextUnformatted("Gillnetter");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Rowboat");
+                    ImSearchDemo_TreeLeaf("Sailboat");
+                    ImSearchDemo_TreeLeaf("Trawler");
+                    ImSearchDemo_TreeLeaf("Catamaran");
+                    ImSearchDemo_TreeLeaf("Kayak");
+                    ImSearchDemo_TreeLeaf("Dinghy");
+                    ImSearchDemo_TreeLeaf("Canoe");
+                    ImSearchDemo_TreeLeaf("Fishing Trawler");
+                    ImSearchDemo_TreeLeaf("Longliner");
+                    ImSearchDemo_TreeLeaf("Gillnetter");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            ImSearch::TreePop();
+            ImSearchDemo_TreePop();
         }
 
-        if (ImSearch::TreeNode("Technologies"))
+        if (ImSearchDemo_TreeNode("Technologies"))
         {
-            if (ImSearch::TreeNode("Computers"))
+            if (ImSearchDemo_TreeNode("Computers"))
             {
-                if (ImSearch::TreeNode("Hardware"))
+                if (ImSearchDemo_TreeNode("Hardware"))
                 {
-                    ImSearch::TextUnformatted("CPU");
-                    ImSearch::TextUnformatted("GPU");
-                    ImSearch::TextUnformatted("RAM");
-                    ImSearch::TextUnformatted("Motherboard");
-                    ImSearch::TextUnformatted("SSD");
-                    ImSearch::TextUnformatted("HDD");
-                    ImSearch::TextUnformatted("Power Supply");
-                    ImSearch::TextUnformatted("Cooler");
-                    ImSearch::TextUnformatted("Case");
-                    ImSearch::TextUnformatted("Network Card");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("CPU");
+                    ImSearchDemo_TreeLeaf("GPU");
+                    ImSearchDemo_TreeLeaf("RAM");
+                    ImSearchDemo_TreeLeaf("Motherboard");
+                    ImSearchDemo_TreeLeaf("SSD");
+                    ImSearchDemo_TreeLeaf("HDD");
+                    ImSearchDemo_TreeLeaf("Power Supply");
+                    ImSearchDemo_TreeLeaf("Cooler");
+                    ImSearchDemo_TreeLeaf("Case");
+                    ImSearchDemo_TreeLeaf("Network Card");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Software"))
+                if (ImSearchDemo_TreeNode("Software"))
                 {
-                    ImSearch::TextUnformatted("Operating System");
-                    ImSearch::TextUnformatted("Web Browser");
-                    ImSearch::TextUnformatted("Office Suite");
-                    ImSearch::TextUnformatted("IDE");
-                    ImSearch::TextUnformatted("Antivirus");
-                    ImSearch::TextUnformatted("Drivers");
-                    ImSearch::TextUnformatted("Database");
-                    ImSearch::TextUnformatted("Virtual Machine");
-                    ImSearch::TextUnformatted("Compiler");
-                    ImSearch::TextUnformatted("Text Editor");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Operating System");
+                    ImSearchDemo_TreeLeaf("Web Browser");
+                    ImSearchDemo_TreeLeaf("Office Suite");
+                    ImSearchDemo_TreeLeaf("IDE");
+                    ImSearchDemo_TreeLeaf("Antivirus");
+                    ImSearchDemo_TreeLeaf("Drivers");
+                    ImSearchDemo_TreeLeaf("Database");
+                    ImSearchDemo_TreeLeaf("Virtual Machine");
+                    ImSearchDemo_TreeLeaf("Compiler");
+                    ImSearchDemo_TreeLeaf("Text Editor");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Networking"))
+                if (ImSearchDemo_TreeNode("Networking"))
                 {
-                    ImSearch::TextUnformatted("Router");
-                    ImSearch::TextUnformatted("Switch");
-                    ImSearch::TextUnformatted("Firewall");
-                    ImSearch::TextUnformatted("Modem");
-                    ImSearch::TextUnformatted("Access Point");
-                    ImSearch::TextUnformatted("Ethernet Cable");
-                    ImSearch::TextUnformatted("Fiber Optic Cable");
-                    ImSearch::TextUnformatted("VPN");
-                    ImSearch::TextUnformatted("DNS");
-                    ImSearch::TextUnformatted("DHCP");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Router");
+                    ImSearchDemo_TreeLeaf("Switch");
+                    ImSearchDemo_TreeLeaf("Firewall");
+                    ImSearchDemo_TreeLeaf("Modem");
+                    ImSearchDemo_TreeLeaf("Access Point");
+                    ImSearchDemo_TreeLeaf("Ethernet Cable");
+                    ImSearchDemo_TreeLeaf("Fiber Optic Cable");
+                    ImSearchDemo_TreeLeaf("VPN");
+                    ImSearchDemo_TreeLeaf("DNS");
+                    ImSearchDemo_TreeLeaf("DHCP");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            if (ImSearch::TreeNode("Vehicles"))
+            if (ImSearchDemo_TreeNode("Vehicles"))
             {
-                if (ImSearch::TreeNode("Land"))
+                if (ImSearchDemo_TreeNode("Land"))
                 {
-                    ImSearch::TextUnformatted("Car");
-                    ImSearch::TextUnformatted("Truck");
-                    ImSearch::TextUnformatted("Motorcycle");
-                    ImSearch::TextUnformatted("Bicycle");
-                    ImSearch::TextUnformatted("Bus");
-                    ImSearch::TextUnformatted("Train");
-                    ImSearch::TextUnformatted("Tram");
-                    ImSearch::TextUnformatted("Tank");
-                    ImSearch::TextUnformatted("ATV");
-                    ImSearch::TextUnformatted("Segway");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Car");
+                    ImSearchDemo_TreeLeaf("Truck");
+                    ImSearchDemo_TreeLeaf("Motorcycle");
+                    ImSearchDemo_TreeLeaf("Bicycle");
+                    ImSearchDemo_TreeLeaf("Bus");
+                    ImSearchDemo_TreeLeaf("Train");
+                    ImSearchDemo_TreeLeaf("Tram");
+                    ImSearchDemo_TreeLeaf("Tank");
+                    ImSearchDemo_TreeLeaf("ATV");
+                    ImSearchDemo_TreeLeaf("Segway");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Air"))
+                if (ImSearchDemo_TreeNode("Air"))
                 {
-                    ImSearch::TextUnformatted("Airplane");
-                    ImSearch::TextUnformatted("Helicopter");
-                    ImSearch::TextUnformatted("Drone");
-                    ImSearch::TextUnformatted("Glider");
-                    ImSearch::TextUnformatted("Hot Air Balloon");
-                    ImSearch::TextUnformatted("Jet");
-                    ImSearch::TextUnformatted("Blimp");
-                    ImSearch::TextUnformatted("Autogyro");
-                    ImSearch::TextUnformatted("Seaplane");
-                    ImSearch::TextUnformatted("Hang Glider");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Airplane");
+                    ImSearchDemo_TreeLeaf("Helicopter");
+                    ImSearchDemo_TreeLeaf("Drone");
+                    ImSearchDemo_TreeLeaf("Glider");
+                    ImSearchDemo_TreeLeaf("Hot Air Balloon");
+                    ImSearchDemo_TreeLeaf("Jet");
+                    ImSearchDemo_TreeLeaf("Blimp");
+                    ImSearchDemo_TreeLeaf("Autogyro");
+                    ImSearchDemo_TreeLeaf("Seaplane");
+                    ImSearchDemo_TreeLeaf("Hang Glider");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Sea"))
+                if (ImSearchDemo_TreeNode("Sea"))
                 {
-                    ImSearch::TextUnformatted("Ship");
-                    ImSearch::TextUnformatted("Boat");
-                    ImSearch::TextUnformatted("Submarine");
-                    ImSearch::TextUnformatted("Yacht");
-                    ImSearch::TextUnformatted("Canoe");
-                    ImSearch::TextUnformatted("Ferry");
-                    ImSearch::TextUnformatted("Sailboat");
-                    ImSearch::TextUnformatted("Tugboat");
-                    ImSearch::TextUnformatted("Catamaran");
-                    ImSearch::TextUnformatted("Dinghy");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Ship");
+                    ImSearchDemo_TreeLeaf("Boat");
+                    ImSearchDemo_TreeLeaf("Submarine");
+                    ImSearchDemo_TreeLeaf("Yacht");
+                    ImSearchDemo_TreeLeaf("Canoe");
+                    ImSearchDemo_TreeLeaf("Ferry");
+                    ImSearchDemo_TreeLeaf("Sailboat");
+                    ImSearchDemo_TreeLeaf("Tugboat");
+                    ImSearchDemo_TreeLeaf("Catamaran");
+                    ImSearchDemo_TreeLeaf("Dinghy");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            ImSearch::TreePop();
+            ImSearchDemo_TreePop();
         }
 
-        if (ImSearch::TreeNode("Nature"))
+        if (ImSearchDemo_TreeNode("Nature"))
         {
-            if (ImSearch::TreeNode("Animals"))
+            if (ImSearchDemo_TreeNode("Animals"))
             {
-                if (ImSearch::TreeNode("Mammals"))
+                if (ImSearchDemo_TreeNode("Mammals"))
                 {
-                    ImSearch::TextUnformatted("Lion");
-                    ImSearch::TextUnformatted("Tiger");
-                    ImSearch::TextUnformatted("Elephant");
-                    ImSearch::TextUnformatted("Whale");
-                    ImSearch::TextUnformatted("Dolphin");
-                    ImSearch::TextUnformatted("Bat");
-                    ImSearch::TextUnformatted("Kangaroo");
-                    ImSearch::TextUnformatted("Human");
-                    ImSearch::TextUnformatted("Bear");
-                    ImSearch::TextUnformatted("Wolf");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Lion");
+                    ImSearchDemo_TreeLeaf("Tiger");
+                    ImSearchDemo_TreeLeaf("Elephant");
+                    ImSearchDemo_TreeLeaf("Whale");
+                    ImSearchDemo_TreeLeaf("Dolphin");
+                    ImSearchDemo_TreeLeaf("Bat");
+                    ImSearchDemo_TreeLeaf("Kangaroo");
+                    ImSearchDemo_TreeLeaf("Human");
+                    ImSearchDemo_TreeLeaf("Bear");
+                    ImSearchDemo_TreeLeaf("Wolf");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Birds"))
+                if (ImSearchDemo_TreeNode("Birds"))
                 {
-                    ImSearch::TextUnformatted("Eagle");
-                    ImSearch::TextUnformatted("Sparrow");
-                    ImSearch::TextUnformatted("Penguin");
-                    ImSearch::TextUnformatted("Owl");
-                    ImSearch::TextUnformatted("Parrot");
-                    ImSearch::TextUnformatted("Flamingo");
-                    ImSearch::TextUnformatted("Duck");
-                    ImSearch::TextUnformatted("Goose");
-                    ImSearch::TextUnformatted("Hawk");
-                    ImSearch::TextUnformatted("Crow");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Eagle");
+                    ImSearchDemo_TreeLeaf("Sparrow");
+                    ImSearchDemo_TreeLeaf("Penguin");
+                    ImSearchDemo_TreeLeaf("Owl");
+                    ImSearchDemo_TreeLeaf("Parrot");
+                    ImSearchDemo_TreeLeaf("Flamingo");
+                    ImSearchDemo_TreeLeaf("Duck");
+                    ImSearchDemo_TreeLeaf("Goose");
+                    ImSearchDemo_TreeLeaf("Hawk");
+                    ImSearchDemo_TreeLeaf("Crow");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Reptiles"))
+                if (ImSearchDemo_TreeNode("Reptiles"))
                 {
-                    ImSearch::TextUnformatted("Crocodile");
-                    ImSearch::TextUnformatted("Snake");
-                    ImSearch::TextUnformatted("Lizard");
-                    ImSearch::TextUnformatted("Turtle");
-                    ImSearch::TextUnformatted("Chameleon");
-                    ImSearch::TextUnformatted("Gecko");
-                    ImSearch::TextUnformatted("Alligator");
-                    ImSearch::TextUnformatted("Komodo Dragon");
-                    ImSearch::TextUnformatted("Iguana");
-                    ImSearch::TextUnformatted("Rattlesnake");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Crocodile");
+                    ImSearchDemo_TreeLeaf("Snake");
+                    ImSearchDemo_TreeLeaf("Lizard");
+                    ImSearchDemo_TreeLeaf("Turtle");
+                    ImSearchDemo_TreeLeaf("Chameleon");
+                    ImSearchDemo_TreeLeaf("Gecko");
+                    ImSearchDemo_TreeLeaf("Alligator");
+                    ImSearchDemo_TreeLeaf("Komodo Dragon");
+                    ImSearchDemo_TreeLeaf("Iguana");
+                    ImSearchDemo_TreeLeaf("Rattlesnake");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
-        	if (ImSearch::TreeNode("Plants"))
+        	if (ImSearchDemo_TreeNode("Plants"))
             {
-                if (ImSearch::TreeNode("Trees"))
+                if (ImSearchDemo_TreeNode("Trees"))
                 {
-                    ImSearch::TextUnformatted("Oak");
-                    ImSearch::TextUnformatted("Pine");
-                    ImSearch::TextUnformatted("Maple");
-                    ImSearch::TextUnformatted("Birch");
-                    ImSearch::TextUnformatted("Cedar");
-                    ImSearch::TextUnformatted("Redwood");
-                    ImSearch::TextUnformatted("Palm");
-                    ImSearch::TextUnformatted("Willow");
-                    ImSearch::TextUnformatted("Spruce");
-                    ImSearch::TextUnformatted("Cypress");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Oak");
+                    ImSearchDemo_TreeLeaf("Pine");
+                    ImSearchDemo_TreeLeaf("Maple");
+                    ImSearchDemo_TreeLeaf("Birch");
+                    ImSearchDemo_TreeLeaf("Cedar");
+                    ImSearchDemo_TreeLeaf("Redwood");
+                    ImSearchDemo_TreeLeaf("Palm");
+                    ImSearchDemo_TreeLeaf("Willow");
+                    ImSearchDemo_TreeLeaf("Spruce");
+                    ImSearchDemo_TreeLeaf("Cypress");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Flowers"))
+                if (ImSearchDemo_TreeNode("Flowers"))
                 {
-                    ImSearch::TextUnformatted("Rose");
-                    ImSearch::TextUnformatted("Tulip");
-                    ImSearch::TextUnformatted("Sunflower");
-                    ImSearch::TextUnformatted("Daisy");
-                    ImSearch::TextUnformatted("Orchid");
-                    ImSearch::TextUnformatted("Lily");
-                    ImSearch::TextUnformatted("Marigold");
-                    ImSearch::TextUnformatted("Daffodil");
-                    ImSearch::TextUnformatted("Chrysanthemum");
-                    ImSearch::TextUnformatted("Iris");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Rose");
+                    ImSearchDemo_TreeLeaf("Tulip");
+                    ImSearchDemo_TreeLeaf("Sunflower");
+                    ImSearchDemo_TreeLeaf("Daisy");
+                    ImSearchDemo_TreeLeaf("Orchid");
+                    ImSearchDemo_TreeLeaf("Lily");
+                    ImSearchDemo_TreeLeaf("Marigold");
+                    ImSearchDemo_TreeLeaf("Daffodil");
+                    ImSearchDemo_TreeLeaf("Chrysanthemum");
+                    ImSearchDemo_TreeLeaf("Iris");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Fungi"))
+                if (ImSearchDemo_TreeNode("Fungi"))
                 {
-                    ImSearch::TextUnformatted("Button Mushroom");
-                    ImSearch::TextUnformatted("Shiitake");
-                    ImSearch::TextUnformatted("Oyster Mushroom");
-                    ImSearch::TextUnformatted("Morel");
-                    ImSearch::TextUnformatted("Chanterelle");
-                    ImSearch::TextUnformatted("Truffle");
-                    ImSearch::TextUnformatted("Fly Agaric");
-                    ImSearch::TextUnformatted("Porcini");
-                    ImSearch::TextUnformatted("Puffball");
-                    ImSearch::TextUnformatted("Enoki");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Button Mushroom");
+                    ImSearchDemo_TreeLeaf("Shiitake");
+                    ImSearchDemo_TreeLeaf("Oyster Mushroom");
+                    ImSearchDemo_TreeLeaf("Morel");
+                    ImSearchDemo_TreeLeaf("Chanterelle");
+                    ImSearchDemo_TreeLeaf("Truffle");
+                    ImSearchDemo_TreeLeaf("Fly Agaric");
+                    ImSearchDemo_TreeLeaf("Porcini");
+                    ImSearchDemo_TreeLeaf("Puffball");
+                    ImSearchDemo_TreeLeaf("Enoki");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            ImSearch::TreePop();
+            ImSearchDemo_TreePop();
         }
-		if (ImSearch::TreeNode("Culinary"))
+		if (ImSearchDemo_TreeNode("Culinary"))
         {
-            if (ImSearch::TreeNode("Ingredients"))
+            if (ImSearchDemo_TreeNode("Ingredients"))
             {
-                if (ImSearch::TreeNode("Spices"))
+                if (ImSearchDemo_TreeNode("Spices"))
                 {
-                    ImSearch::TextUnformatted("Salt");
-                    ImSearch::TextUnformatted("Pepper");
-                    ImSearch::TextUnformatted("Paprika");
-                    ImSearch::TextUnformatted("Cumin");
-                    ImSearch::TextUnformatted("Turmeric");
-                    ImSearch::TextUnformatted("Oregano");
-                    ImSearch::TextUnformatted("Basil");
-                    ImSearch::TextUnformatted("Thyme");
-                    ImSearch::TextUnformatted("Cinnamon");
-                    ImSearch::TextUnformatted("Nutmeg");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Salt");
+                    ImSearchDemo_TreeLeaf("Pepper");
+                    ImSearchDemo_TreeLeaf("Paprika");
+                    ImSearchDemo_TreeLeaf("Cumin");
+                    ImSearchDemo_TreeLeaf("Turmeric");
+                    ImSearchDemo_TreeLeaf("Oregano");
+                    ImSearchDemo_TreeLeaf("Basil");
+                    ImSearchDemo_TreeLeaf("Thyme");
+                    ImSearchDemo_TreeLeaf("Cinnamon");
+                    ImSearchDemo_TreeLeaf("Nutmeg");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Produce"))
+                if (ImSearchDemo_TreeNode("Produce"))
                 {
-                    ImSearch::TextUnformatted("Carrot");
-                    ImSearch::TextUnformatted("Onion");
-                    ImSearch::TextUnformatted("Garlic");
-                    ImSearch::TextUnformatted("Pepper");
-                    ImSearch::TextUnformatted("Tomato");
-                    ImSearch::TextUnformatted("Lettuce");
-                    ImSearch::TextUnformatted("Spinach");
-                    ImSearch::TextUnformatted("Broccoli");
-                    ImSearch::TextUnformatted("Eggplant");
-                    ImSearch::TextUnformatted("Zucchini");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Carrot");
+                    ImSearchDemo_TreeLeaf("Onion");
+                    ImSearchDemo_TreeLeaf("Garlic");
+                    ImSearchDemo_TreeLeaf("Pepper");
+                    ImSearchDemo_TreeLeaf("Tomato");
+                    ImSearchDemo_TreeLeaf("Lettuce");
+                    ImSearchDemo_TreeLeaf("Spinach");
+                    ImSearchDemo_TreeLeaf("Broccoli");
+                    ImSearchDemo_TreeLeaf("Eggplant");
+                    ImSearchDemo_TreeLeaf("Zucchini");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Proteins"))
+                if (ImSearchDemo_TreeNode("Proteins"))
                 {
-                    ImSearch::TextUnformatted("Chicken");
-                    ImSearch::TextUnformatted("Beef");
-                    ImSearch::TextUnformatted("Pork");
-                    ImSearch::TextUnformatted("Tofu");
-                    ImSearch::TextUnformatted("Lentils");
-                    ImSearch::TextUnformatted("Fish");
-                    ImSearch::TextUnformatted("Eggs");
-                    ImSearch::TextUnformatted("Beans");
-                    ImSearch::TextUnformatted("Lamb");
-                    ImSearch::TextUnformatted("Turkey");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Chicken");
+                    ImSearchDemo_TreeLeaf("Beef");
+                    ImSearchDemo_TreeLeaf("Pork");
+                    ImSearchDemo_TreeLeaf("Tofu");
+                    ImSearchDemo_TreeLeaf("Lentils");
+                    ImSearchDemo_TreeLeaf("Fish");
+                    ImSearchDemo_TreeLeaf("Eggs");
+                    ImSearchDemo_TreeLeaf("Beans");
+                    ImSearchDemo_TreeLeaf("Lamb");
+                    ImSearchDemo_TreeLeaf("Turkey");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
-			if (ImSearch::TreeNode("Recipes"))
+			if (ImSearchDemo_TreeNode("Recipes"))
             {
-                if (ImSearch::TreeNode("Soups"))
+                if (ImSearchDemo_TreeNode("Soups"))
                 {
-                    ImSearch::TextUnformatted("Chicken Noodle Soup");
-                    ImSearch::TextUnformatted("Tomato Soup");
-                    ImSearch::TextUnformatted("Miso Soup");
-                    ImSearch::TextUnformatted("Minestrone");
-                    ImSearch::TextUnformatted("Clam Chowder");
-                    ImSearch::TextUnformatted("Pho");
-                    ImSearch::TextUnformatted("Ramen");
-                    ImSearch::TextUnformatted("Gazpacho");
-                    ImSearch::TextUnformatted("Pumpkin Soup");
-                    ImSearch::TextUnformatted("Lentil Soup");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Chicken Noodle Soup");
+                    ImSearchDemo_TreeLeaf("Tomato Soup");
+                    ImSearchDemo_TreeLeaf("Miso Soup");
+                    ImSearchDemo_TreeLeaf("Minestrone");
+                    ImSearchDemo_TreeLeaf("Clam Chowder");
+                    ImSearchDemo_TreeLeaf("Pho");
+                    ImSearchDemo_TreeLeaf("Ramen");
+                    ImSearchDemo_TreeLeaf("Gazpacho");
+                    ImSearchDemo_TreeLeaf("Pumpkin Soup");
+                    ImSearchDemo_TreeLeaf("Lentil Soup");
+                    ImSearchDemo_TreePop();
                 }
-                if (ImSearch::TreeNode("Desserts"))
+                if (ImSearchDemo_TreeNode("Desserts"))
                 {
-                    ImSearch::TextUnformatted("Chocolate Cake");
-                    ImSearch::TextUnformatted("Apple Pie");
-                    ImSearch::TextUnformatted("Ice Cream");
-                    ImSearch::TextUnformatted("Brownies");
-                    ImSearch::TextUnformatted("Cheesecake");
-                    ImSearch::TextUnformatted("Pudding");
-                    ImSearch::TextUnformatted("Tiramisu");
-                    ImSearch::TextUnformatted("Crepes");
-                    ImSearch::TextUnformatted("Cupcakes");
-                    ImSearch::TextUnformatted("Macarons");
-                    ImSearch::TreePop();
+                    ImSearchDemo_TreeLeaf("Chocolate Cake");
+                    ImSearchDemo_TreeLeaf("Apple Pie");
+                    ImSearchDemo_TreeLeaf("Ice Cream");
+                    ImSearchDemo_TreeLeaf("Brownies");
+                    ImSearchDemo_TreeLeaf("Cheesecake");
+                    ImSearchDemo_TreeLeaf("Pudding");
+                    ImSearchDemo_TreeLeaf("Tiramisu");
+                    ImSearchDemo_TreeLeaf("Crepes");
+                    ImSearchDemo_TreeLeaf("Cupcakes");
+                    ImSearchDemo_TreeLeaf("Macarons");
+                    ImSearchDemo_TreePop();
                 }
-                ImSearch::TreePop();
+                ImSearchDemo_TreePop();
             }
 
-            ImSearch::TreePop();
-        }*/
+            ImSearchDemo_TreePop();
+        }
 
-	//	ImSearch::EndSearch();
-	//	ImGui::TreePop();
-	//}
-
-
+		ImSearch::EndSearch();
+		ImGui::TreePop();
+	}
 
 	ImGui::End();
 }
-
-
-
 
 namespace
 {
@@ -703,7 +668,35 @@ namespace
 
 		return str.c_str();
 	}
+
+    bool ImSearchDemo_TreeNode(const char* name)
+    {
+        return ImSearch::PushSearchable(name, [](const char* name)
+            {
+                return ImGui::TreeNode(name);
+            });
+    }
+
+    void ImSearchDemo_TreeLeaf(const char* name)
+    {
+        if (ImSearch::PushSearchable(name,
+            [](const char* name)
+            {
+                ImGui::Selectable(name);
+                return true;
+            }))
+        {
+            ImSearch::PopSearchable();
+        }
+    }
+
+    void ImSearchDemo_TreePop()
+    {
+        ImSearch::PopSearchable(
+            []()
+            {
+                ImGui::TreePop();
+            });
+    }
 }
-
-
 #endif // #ifndef IMGUI_DISABLE
