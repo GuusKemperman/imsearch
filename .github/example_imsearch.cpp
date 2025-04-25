@@ -11,6 +11,7 @@ int main(int, char**)
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImSearch::CreateContext();
 
     // Additional imgui initialization needed when no backend is present
     ImGui::GetIO().DisplaySize = ImVec2(400.f, 400.f);
@@ -24,6 +25,7 @@ int main(int, char**)
         ImGui::Render();
     }
 
+    ImSearch::DestroyContext();
     ImGui::DestroyContext();
     puts("sample_imsearch: end\n");
     return 0;

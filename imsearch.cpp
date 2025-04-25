@@ -109,7 +109,7 @@ namespace
 		VTableFunctor mOnDisplayEnd{};
 	};
 
-	struct SearchContext
+	struct LocalContext
 	{
 		Input mInput{};
 
@@ -119,15 +119,64 @@ namespace
 		Result mResult{};
 		bool mHasSubmitted{};
 	};
-	std::unordered_map<ImGuiID, SearchContext> sContexts{};
-	std::stack<std::reference_wrapper<SearchContext>> sContextStack{};
+}
+
+namespace ImSearch
+{
+	struct ImSearchContext
+	{
+		std::unordered_map<ImGuiID, LocalContext> Contexts{};
+		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
+	};
+}
+
+namespace
+{
+	ImSearch::ImSearchContext* sContext{};
 
 	// Anything below this score is not displayed to the user.
 	constexpr float sCutOffStrength = .3f;
 
+	LocalContext& GetLocalContext();
+	ImSearch::ImSearchContext& GetImSearchContext();
+
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
 	void BringResultUpToDate(Result& result);
-	void DisplayToUser(const SearchContext& context, const Result& result);
+	void DisplayToUser(const LocalContext& context, const Result& result);
+}
+
+ImSearch::ImSearchContext* ImSearch::CreateContext()
+{
+	ImSearchContext* ctx = IM_NEW(ImSearchContext)();
+	if (sContext == nullptr)
+	{
+		SetCurrentContext(ctx);
+	}
+	return ctx;
+}
+
+void ImSearch::DestroyContext(ImSearchContext* ctx)
+{
+	if (ctx == nullptr)
+	{
+		ctx = sContext;
+	}
+
+	if (sContext == ctx)
+	{
+		SetCurrentContext(nullptr);
+	}
+	IM_DELETE(ctx);
+}
+
+ImSearch::ImSearchContext* ImSearch::GetCurrentContext()
+{
+	return sContext;
+}
+
+void ImSearch::SetCurrentContext(ImSearchContext* ctx)
+{
+	sContext = ctx;
 }
 
 bool ImSearch::BeginSearch()
@@ -135,17 +184,18 @@ bool ImSearch::BeginSearch()
 	const ImGuiID imId = ImGui::GetID("Search");
 	ImGui::PushID(static_cast<int>(imId));
 
-	SearchContext& context = sContexts[imId];
-	sContextStack.emplace(context);
+	ImSearchContext& context = GetImSearchContext();
+	LocalContext& localContext = context.Contexts[imId];
+	context.ContextStack.emplace(localContext);
 
-	context.mHasSubmitted = false;
+	localContext.mHasSubmitted = false;
 
 	return true;
 }
 
 void ImSearch::SearchBar(const char* hint)
 {
-	SearchContext& context = sContextStack.top();
+	LocalContext& context = GetLocalContext();
 
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
@@ -180,7 +230,7 @@ void ImSearch::SearchBar(const char* hint)
 
 void ImSearch::Submit()
 {
-	SearchContext& context = sContextStack.top();
+	LocalContext& context = GetLocalContext();
 	Result& lastValidResult = context.mResult;
 
 	if (!IsResultUpToDate(lastValidResult, context.mInput))
@@ -198,22 +248,22 @@ void ImSearch::Submit()
 
 void ImSearch::EndSearch()
 {
-	IM_ASSERT(!sContextStack.empty() && "Called End without matching start");
+	LocalContext& localContext = GetLocalContext();
 
-	SearchContext& context = sContextStack.top();
-
-	if (!context.mHasSubmitted)
+	if (!localContext.mHasSubmitted)
 	{
 		Submit();
 	}
 
 	ImGui::PopID();
-	sContextStack.pop();
+
+	ImSearch::ImSearchContext& context = GetImSearchContext();
+	context.ContextStack.pop();
 }
 
 bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
 {
-	SearchContext& context = sContextStack.top();
+	LocalContext& context = GetLocalContext();
 
 	IM_ASSERT(!context.mHasSubmitted && "Tried calling PushSearchable after EndSearch or Submit");
 
@@ -264,22 +314,24 @@ void ImSearch::PopSearchable()
 
 void ImSearch::SetUserQuery(const char* query)
 {
-	SearchContext& context = sContextStack.top();
+	LocalContext& context = GetLocalContext();
 	context.mInput.mUserQuery = std::string{ query };
 }
 
 const char* ImSearch::GetUserQuery()
 {
-	if (sContextStack.empty())
+	ImSearch::ImSearchContext& context = GetImSearchContext();
+
+	if (context.ContextStack.empty())
 	{
 		return nullptr;
 	}
-	return sContextStack.top().get().mInput.mUserQuery.c_str();
+	return context.ContextStack.top().get().mInput.mUserQuery.c_str();
 }
 
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
-	SearchContext& context = sContextStack.top();
+	LocalContext& context = GetLocalContext();
 
 	IM_ASSERT(!context.mHasSubmitted && "Tried calling PopSearchable after EndSearch or Submit");
 
@@ -363,6 +415,20 @@ namespace
 
 		ImGui::MemFree(mData);
 		mData = nullptr;
+	}
+
+	LocalContext& GetLocalContext()
+	{
+		ImSearch::ImSearchContext& ImSearchContext = GetImSearchContext();
+		IM_ASSERT(!ImSearchContext.ContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
+		return ImSearchContext.ContextStack.top();
+	}
+
+	ImSearch::ImSearchContext& GetImSearchContext()
+	{
+		ImSearch::ImSearchContext* context = ImSearch::GetCurrentContext();
+		IM_ASSERT(sContext != nullptr && "An ImSearchContext has not been created, see ImSearch::CreateContext");
+		return *context;
 	}
 
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput)
@@ -531,7 +597,7 @@ namespace
 		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
 	}
 
-	void DisplayToUser(const SearchContext& context, const Result& result)
+	void DisplayToUser(const LocalContext& context, const Result& result)
 	{
 		const bool isUserSearching = !result.mInput.mUserQuery.empty();
 		ImGui::PushID(isUserSearching);

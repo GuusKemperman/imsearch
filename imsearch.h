@@ -4,6 +4,20 @@
 
 namespace ImSearch
 {
+	struct ImSearchContext;
+
+	// Creates a new ImSearch context. Call this after ImGui::CreateContext.
+	ImSearchContext* CreateContext();
+
+	// Destroys an ImSearch context. Call this before ImGui::DestroyContext. nullptr = destroy current context
+	void DestroyContext(ImSearchContext* ctx = nullptr);
+
+	// Returns the current context. nullptr if not context has been set.
+	ImSearchContext* GetCurrentContext();
+
+	// Sets the current context. 
+	void SetCurrentContext(ImSearchContext* ctx);
+
 	/**
 	 * \brief Requires End() to be called if returns true
 	 */
