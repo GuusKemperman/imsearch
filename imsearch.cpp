@@ -36,7 +36,7 @@ namespace
 	{
 		VTableFunctor() = default;
 
-		VTableFunctor(void* originalFunctor, ImSearch::VTable vTable);
+		VTableFunctor(void* originalFunctor, ImSearch::Internal::VTable vTable);
 
 		VTableFunctor(const VTableFunctor&) = delete;
 		VTableFunctor(VTableFunctor&& other) noexcept;
@@ -64,7 +64,7 @@ namespace
 			GetSize = 3
 		};
 
-		ImSearch::VTable mVTable{};
+		ImSearch::Internal::VTable mVTable{};
 		char* mData{};
 	};
 
@@ -208,7 +208,7 @@ void ImSearch::SearchBar(const char* hint)
 		ImGuiInputTextFlags_CallbackResize,
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
-			std::string* str = (std::string*)data->UserData;
+			std::string* str = static_cast<std::string*>(data->UserData);
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 			{
 				// Resize string callback
@@ -348,7 +348,7 @@ void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 
 namespace
 {
-	VTableFunctor::VTableFunctor(void* originalFunctor, ImSearch::VTable vTable) :
+	VTableFunctor::VTableFunctor(void* originalFunctor, ImSearch::Internal::VTable vTable) :
 		mVTable(vTable)
 	{
 		if (mVTable == nullptr)
@@ -441,7 +441,7 @@ namespace
 			return false;
 		}
 
-		// C++11 didnt have nice algorithms for comparing ranges :(
+		// C++11 didn't have nice algorithms for comparing ranges :(
 		for (size_t i = 0; i < oldInput.mEntries.size(); i++)
 		{
 			const Searchable& oldEntry = oldInput.mEntries[i];
