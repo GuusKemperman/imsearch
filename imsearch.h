@@ -29,14 +29,20 @@ namespace ImSearch
 	// Starts a searching context. If this function returns true, EndSearch() MUST
 	// be called! You are encouraged to use the following convention:
 	//
-	// if (BeginSearch())
-	// {
-	//     SearchBar();
-	//     ...
-	//     [Calls to PushSearchable/PopSearchable here]
-	//     ...
-	//     EndSearch();
-	// }
+	//	if (BeginSearch())
+	//	{
+	//		SearchBar();
+	//
+	//		ImSearch::SearchableItem("Hello world!",
+	//			[](const char* str)
+	//			{
+	//				ImGui::Button(str);
+	//			});
+	//
+	//		...
+	//
+	//		EndSearch();
+	//	}
 	//
 	// See imsearch_demo.cpp for more examples.
 	// 
@@ -65,15 +71,11 @@ namespace ImSearch
 	//	
 	//		if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
 	//		{
-	//			if (ImSearch::PushSearchable("Hello world!",
+	//			ImSearch::SearchableItem("Hello world!",
 	//				[](const char* str)
 	//				{
-	//					ImGui::TextUnformatted(str);
-	//					return true;
-	//				}))
-	//			{
-	//				ImSearch::PopSearchable();
-	//			}
+	//					ImGui::Button(str);
+	//				});
 	//	
 	//			// Call Submit explicitly; all the callbacks
 	//			// will be invoked through submit. If we
@@ -92,6 +94,25 @@ namespace ImSearch
 	// [SECTION] Submitting Searchables
 	//-----------------------------------------------------------------------------
 
+	// Add a searchable with a callback, wrapping some ImGui function calls, for example:
+	// 
+	//	ImSearch::SearchableItem("Hello world!",
+	//		[](const char* str)
+	//		{
+	//			ImGui::Button(str);
+	//		});
+	//
+	// Note that callbacks are called in order of relevancy, or maybe not even called at all,
+	// if they are not relevant. ImSearch is free to invoke your callbacks anywhere between you
+	// submitting them, and you calling EndSearch or Submit. The callback may have data
+	// associated with (e.g., lambda captures). Make sure that your callback object
+	// is not referencing anything that will be out of scope by then. For more information, see
+	// 'How do callbacks work?' in imsearch_demo.cpp.
+	//
+	// Callback is an object or function pointer with a function of the form: void Func(const char* name).
+	template<typename T>
+	void SearchableItem(const char* name, T&& callback);
+
 	// Push a searchable with a callback, wrapping some ImGui function calls.
 	// If this function returns true, EndSearch() MUST
 	// be called! You are encouraged to use the following convention:
@@ -101,10 +122,11 @@ namespace ImSearch
 	//		PopSearchable([](){ ImGui::TreePop(); });
 	// }
 	//
-	// The provided callback function should return true if the 'children' should also be displayed, similar to ImGui's
-	// TreeNodes.
+	// The provided callback function should return true if the 'children' should also be
+	// displayed, similar to ImGui's TreeNodes.
 	//
 	// Callback is an object or function pointer with a function of the form: bool Func(const char* name).
+	//
 	// Note that callbacks are called in order of relevancy, or maybe not even called at all,
 	// if they are not relevant. ImSearch is free to invoke your callbacks anywhere between you
 	// submitting them, and you calling EndSearch or Submit. The callback may have data
@@ -121,10 +143,12 @@ namespace ImSearch
 	// Only call PopSearchable() if PushSearchable() returns true! Typically called at the end
 	// of an if statement conditioned on PushSearchable(). 
 	// You can use a callback for wrapping all the ImGui calls needed for 'ending' your widget,
-	// a common example being `ImGui::TreePop()`, see example above PushSearchable. 
+	// a common example being `ImGui::TreePop()`, see example above PushSearchable.
+	//
+	// Callback is an object or function pointer with a function of the form: void Func().
 	template<typename T>
 	void PopSearchable(T&& callback);
-	
+
 	//-----------------------------------------------------------------------------
 	// [SECTION] Searchbars
 	//-----------------------------------------------------------------------------
@@ -156,7 +180,7 @@ namespace ImSearch
 	// Starting from here until the end of the file,
 	// forwards compatibility is not guaranteed!
 
-	namespace Internal 
+	namespace Internal
 	{
 		using VTable = bool(*)(int mode, void* ptr1, void* ptr2);
 
@@ -166,6 +190,27 @@ namespace ImSearch
 		template<class T> struct remove_reference { typedef T type; };
 		template<class T> struct remove_reference<T&> { typedef T type; };
 		template<class T> struct remove_reference<T&&> { typedef T type; };
+	}
+}
+
+template <typename T>
+void ImSearch::SearchableItem(const char* name, T&& callback)
+{
+	using TNonRef = typename Internal::remove_reference<T>::type;
+
+	struct CallbackWrapper
+	{
+		TNonRef mUserCallback;
+
+		bool operator()(const char* name) const
+		{
+			(void)mUserCallback(name);
+			return false;
+		}
+	};
+	if (PushSearchable(name, CallbackWrapper{ static_cast<decltype(callback)>(callback) }))
+	{
+		PopSearchable();
 	}
 }
 

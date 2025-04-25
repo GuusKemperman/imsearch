@@ -54,25 +54,20 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		{
             ImSearch::SearchBar();
 
-            if (ImSearch::PushSearchable("Hey there!", 
+            ImSearch::SearchableItem("Hey there!",
                 [](const char* name)
                 {
                     ImGui::Selectable(name);
                     return true;
-                }))
-            {
-                ImSearch::PopSearchable();
-            }
+                });
 
-            if (ImSearch::PushSearchable("Howdy partner!",
+            ImSearch::SearchableItem("Howdy partner!",
                 [](const char* name)
                 {
                     ImGui::Button(name);
+                    ImGui::SetItemTooltip("Click me!");
                     return true;
-                }))
-            {
-                ImSearch::PopSearchable();
-            }
+                });
 
             ImSearch::EndSearch();
 		}
@@ -90,7 +85,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                 ImSearch::SearchBar();
                 for (const char* noun : nouns)
                 {
-                    if (ImSearch::PushSearchable(noun,
+                    ImSearch::SearchableItem(noun,
                         [&](const char* name)
                         {
                             const bool isSelected = name == selectedString;
@@ -98,13 +93,8 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                             {
                                 selectedString = name;
                             }
-                            return true;
-                        }))
-                    {
-                        ImSearch::PopSearchable();
-                    }
+                        });
                 }
-
                 ImSearch::EndSearch();
             }
             ImGui::EndCombo();
@@ -142,15 +132,12 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
             for (int i = 0; i < 3; i++)
             {
-                if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                ImSearch::SearchableItem(GetRandomString(seed, str),
                     [](const char* str)
                     {
                         ImGui::Selectable(str);
                         return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
             }
 
             ImSearch::EndSearch();
@@ -195,7 +182,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             if (ImSearchDemo_CollapsingHeader("Lambdas and captures"))
         	{
                 const std::string tooltip = GetRandomString(seed, str);
-                if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                ImSearch::SearchableItem(GetRandomString(seed, str),
                     // You can capture anything in the lambda you might need.
                     // The easiest way, works with any C++ lambda.
                     [=](const char* str)
@@ -207,11 +194,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                             ImGui::TextUnformatted(tooltip.c_str());
                             ImGui::EndTooltip();
                         }
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
                 ImSearch::PopSearchable();
             }
@@ -234,7 +217,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 				{
                     int hiIWentOutOfScope{};
 
-                    if (ImSearch::PushSearchable("Undefined behaviour, variable out of scope!",
+                    ImSearch::SearchableItem("Undefined behaviour, variable out of scope!",
                         [&hiIWentOutOfScope](const char* name) // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                         {                                                                                       /*^*/
                             ImGui::TextUnformatted(name);                                                       /*^*/
@@ -243,11 +226,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                             // ImGui::InputInt("DontDoThis", &hiIWentOutOfScope);                               /*^*/
                                                                                                                 /*^*/
                         	(void)(hiIWentOutOfScope); // (just to silence warnings of it being unused			/*^*/
-                            return true;                                                                        /*^*/
-                        }))                                                                                     /*^*/
-                    {                                                                                           /*^*/
-                        ImSearch::PopSearchable();                                                              /*^*/
-                    }                                                                                           /*^*/
+                        });                                                                                     /*^*/
 				}                                                                                               /*^*/
                                                                                                                 /*^*/
                 ImSearch::PopSearchable();                                                                      /*^*/
@@ -276,15 +255,11 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             {
                 for (int i = 0; i < 1000; i++)
                 {
-                    if (ImSearch::PushSearchable(GetRandomString(seed, str),
+                    ImSearch::SearchableItem(GetRandomString(seed, str),
                         [](const char* str)
                         {
                             ImGui::TextUnformatted(str);
-                            return true;
-                        }))
-                    {
-                        ImSearch::PopSearchable();
-                    }
+                        });
                 }
 
                 // Call Submit explicitly; all the callbacks
@@ -749,45 +724,34 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
             if (ImSearchDemo_CollapsingHeader("TransformComponent"))
             {
-                if (ImSearch::PushSearchable("Position",
+                ImSearch::SearchableItem("Position",
                     [](const char* name)
                     {
                         static float v[3]{};
                         ImGui::InputFloat3(name, v);
                         return true;
-                    }))
-                {
-	                ImSearch::PopSearchable();
-                }
+                    });
 
-                if (ImSearch::PushSearchable("Scale",
+                ImSearch::SearchableItem("Scale",
                     [](const char* name)
                     {
                         static float v[3]{};
                         ImGui::InputFloat3(name, v);
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
-                if (ImSearch::PushSearchable("Orientation",
+                ImSearch::SearchableItem("Orientation",
                     [](const char* name)
                     {
                         static float v[3]{};
                         ImGui::InputFloat3(name, v);
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
                 ImSearch::PopSearchable();
             }
 
             if (ImSearchDemo_CollapsingHeader("StaticMeshComponent"))
             {
-                if (ImSearch::PushSearchable("Mesh",
+                ImSearch::SearchableItem("Mesh",
                     [](const char* name)
                     {
                         static const char* selectedString = nouns[0];
@@ -798,7 +762,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                                 ImSearch::SearchBar();
                                 for (const char* noun : nouns)
                                 {
-                                    if (ImSearch::PushSearchable(noun,
+                                    ImSearch::SearchableItem(noun,
                                         [&](const char* name)
                                         {
                                             const bool isSelected = name == selectedString;
@@ -807,48 +771,33 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                                                 selectedString = name;
                                             }
                                             return true;
-                                        }))
-                                    {
-                                        ImSearch::PopSearchable();
-                                    }
+                                        });
                                 }
 
                                 ImSearch::EndSearch();
                             }
                             ImGui::EndCombo();
                         }
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
                 ImSearch::PopSearchable();
             }
 
         	if (ImSearchDemo_CollapsingHeader("PhysicsBodyComponent"))
             {
-                if (ImSearch::PushSearchable("Mass",
+                ImSearch::SearchableItem("Mass",
                     [](const char* name)
                     {
                         static float v{};
                         ImGui::InputFloat(name, &v);
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
-                if (ImSearch::PushSearchable("Collision Enabled",
+                ImSearch::SearchableItem("Collision Enabled",
                     [](const char* name)
                     {
                         static bool b{};
                         ImGui::Checkbox(name, &b);
-                        return true;
-                    }))
-                {
-                    ImSearch::PopSearchable();
-                }
+                    });
 
                 ImSearch::PopSearchable();
             }
@@ -899,7 +848,8 @@ namespace
 
     bool ImSearchDemo_TreeNode(const char* name)
     {
-        return ImSearch::PushSearchable(name, [](const char* name)
+        return ImSearch::PushSearchable(name, 
+            [](const char* name)
             {
                 return ImGui::TreeNode(name);
             });
@@ -907,15 +857,11 @@ namespace
 
     void ImSearchDemo_TreeLeaf(const char* name)
     {
-        if (ImSearch::PushSearchable(name,
+        ImSearch::SearchableItem(name, 
             [](const char* name)
             {
                 ImGui::Selectable(name);
-                return true;
-            }))
-        {
-            ImSearch::PopSearchable();
-        }
+            });
     }
 
     void ImSearchDemo_TreePop()
@@ -929,7 +875,8 @@ namespace
 
     bool ImSearchDemo_CollapsingHeader(const char* name)
     {
-        return ImSearch::PushSearchable(name, [](const char* name)
+        return ImSearch::PushSearchable(name, 
+            [](const char* name)
             {
                 return ImGui::CollapsingHeader(name);
             });

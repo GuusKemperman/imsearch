@@ -44,7 +44,7 @@ if (ImGui::BeginCombo("Nouns", selectedString))
         ImSearch::SearchBar();
         for (const char* noun : nouns)
         {
-            if (ImSearch::PushSearchable(noun,
+            ImSearch::SearchableItem(noun,
                 [&](const char* name)
                 {
                     const bool isSelected = name == selectedString;
@@ -53,10 +53,7 @@ if (ImGui::BeginCombo("Nouns", selectedString))
                         selectedString = name;
                     }
                     return true;
-                }))
-            {
-                ImSearch::PopSearchable();
-            }
+                });
         }
 
         ImSearch::EndSearch();
