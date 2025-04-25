@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <numeric>
 #include <limits>
+#include <cctype>
 
 namespace
 {
@@ -648,33 +649,128 @@ namespace
 	}
 }
 
-ImSearch::StringMatcher::StringMatcher(const char* userQuery) :
-	mUserQuery(userQuery),
-	mUserLen(strlen(userQuery))
+namespace
 {
-}
-
-float ImSearch::StringMatcher::operator()(const char* text_body) const
-{
-	if (mUserLen == 0)
+	std::vector<std::string> TokeniseAndSort(const std::string& s)
 	{
-		return 1.0f;
+		std::vector<std::string> tokens;
+		std::string current;
+		for (char c : s) 
+		{
+			if (std::isalnum(c)) 
+			{
+				current += static_cast<char>(std::tolower(c));
+				continue;
+			}
+
+			if (!current.empty()) 
+			{
+				tokens.push_back(current);
+				current.clear();
+			}
+		}
+
+		if (!current.empty()) 
+		{
+			tokens.push_back(current);
+		}
+		std::sort(tokens.begin(), tokens.end());
+		return tokens;
 	}
 
-	size_t current = 0;
-	for (size_t i = 0; text_body[i] != '\0'; ++i)
+	std::string Join(const std::vector<std::string>& tokens)
 	{
-		if (text_body[i] == mUserQuery[current])
+		if (tokens.empty())
 		{
-			current++;
-			if (current == mUserLen)
+			return {};
+		}
+
+		std::string res = tokens[0];
+		for (size_t i = 1; i < tokens.size(); i++) 
+		{
+			res += ' ' + tokens[i];
+		}
+		return res;
+	}
+
+	int LevenshteinDistance(const std::string& s1, const std::string& s2)
+	{
+		const int m = static_cast<int>(s1.size());
+		const int n = static_cast<int>(s2.size());
+		std::vector<std::vector<int>> dp(m + 1, std::vector<int>(n + 1, 0));
+
+		for (int i = 0; i <= m; i++) 
+		{
+			dp[i][0] = i;
+		}
+		for (int j = 0; j <= n; j++)
+		{
+			dp[0][j] = j;
+		}
+
+		for (int i = 1; i <= m; i++)
+		{
+			for (int j = 1; j <= n; j++) 
+			{
+				const int cost = (s1[i - 1] == s2[j - 1]) ? 0 : 1;
+				dp[i][j] = std::min({
+					dp[i - 1][j] + 1,
+					dp[i][j - 1] + 1,
+					dp[i - 1][j - 1] + cost
+					});
+			}
+		}
+		return dp[m][n];
+	}
+
+	int PartialRatio(const std::string& s1, const std::string& s2)
+	{
+		if (s1.empty() 
+			|| s2.empty()) 
+		{
+			return 0;
+		}
+
+		const std::string& shorter = s1.size() <= s2.size() ? s1 : s2;
+		const std::string& longer = (s1.size() <= s2.size()) ? s2 : s1;
+
+		const int shorterSize = static_cast<int>(shorter.size());
+		const int longerSize = static_cast<int>(longer.size());
+
+		int max_ratio = 0;
+		for (int i = 0; i <= longerSize - shorterSize; i++) 
+		{
+			const std::string substring = longer.substr(i, shorterSize);
+			const int distance = LevenshteinDistance(shorter, substring);
+			const int ratio = static_cast<int>((1.0 - static_cast<double>(distance) / shorterSize) * 100);
+
+			max_ratio = std::max(max_ratio, ratio);
+
+			if (max_ratio == 100) 
 			{
 				break;
 			}
 		}
+		return max_ratio;
 	}
 
-	return static_cast<float>(current) / static_cast<float>(mUserLen);
+	int PartialTokenSortRatio(const std::string& processedUserQuery, const std::string& target)
+	{
+		const std::vector<std::string> target_tokens = TokeniseAndSort(target);
+		const std::string processed_target = Join(target_tokens);
+		return PartialRatio(processedUserQuery, processed_target);
+	}
+}
+
+ImSearch::StringMatcher::StringMatcher(const char* userQuery)
+{
+	const std::vector<std::string> queryTokens = TokeniseAndSort(userQuery);
+	mProcessedUserQuery = Join(queryTokens);
+}
+
+float ImSearch::StringMatcher::operator()(const char* text_body) const
+{
+	return static_cast<float>(PartialTokenSortRatio(mProcessedUserQuery, text_body)) / 100.0f;
 }
 
 #endif // #ifndef IMGUI_DISABLE

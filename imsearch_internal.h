@@ -1,6 +1,7 @@
 #pragma once
 #ifndef IMGUI_DISABLE
 
+#include <string>
 #include <cstddef>
 
 namespace ImSearch
@@ -12,8 +13,7 @@ namespace ImSearch
         float operator()(const char* textBody) const;
 
     private:
-        const char* mUserQuery{};
-        size_t mUserLen{};
+        std::string mProcessedUserQuery{};
     };
 }
 
