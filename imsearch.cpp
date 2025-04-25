@@ -653,13 +653,13 @@ namespace
 {
 	std::vector<std::string> TokeniseAndSort(const std::string& s)
 	{
-		std::vector<std::string> tokens;
-		std::string current;
+		std::vector<std::string> tokens{};
+		std::string current{};
 		for (char c : s) 
 		{
-			if (std::isalnum(c)) 
+			if (std::isalnum(static_cast<unsigned char>(c))) 
 			{
-				current += static_cast<char>(std::tolower(c));
+				current += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 				continue;
 			}
 
@@ -756,9 +756,9 @@ namespace
 
 	int PartialTokenSortRatio(const std::string& processedUserQuery, const std::string& target)
 	{
-		const std::vector<std::string> target_tokens = TokeniseAndSort(target);
-		const std::string processed_target = Join(target_tokens);
-		return PartialRatio(processedUserQuery, processed_target);
+		const std::vector<std::string> targetTokens = TokeniseAndSort(target);
+		const std::string processedTarget = Join(targetTokens);
+		return PartialRatio(processedUserQuery, processedTarget);
 	}
 }
 
@@ -768,9 +768,9 @@ ImSearch::StringMatcher::StringMatcher(const char* userQuery)
 	mProcessedUserQuery = Join(queryTokens);
 }
 
-float ImSearch::StringMatcher::operator()(const char* text_body) const
+float ImSearch::StringMatcher::operator()(const char* text) const
 {
-	return static_cast<float>(PartialTokenSortRatio(mProcessedUserQuery, text_body)) / 100.0f;
+	return static_cast<float>(PartialTokenSortRatio(mProcessedUserQuery, text)) / 100.0f;
 }
 
 #endif // #ifndef IMGUI_DISABLE
