@@ -119,9 +119,9 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         {
         	static char query[2048]{};
 
-            const float spaceWidth = ImGui::CalcTextSize(" ").y;
+            const float spaceWidth = ImGui::CalcTextSize(" ").x;
             const float searchbarWidth = ImGui::GetContentRegionAvail().x;
-            const int totalNumCharacters = static_cast<int>(searchbarWidth / spaceWidth) * 2;
+            const int totalNumCharacters = static_cast<int>(searchbarWidth / spaceWidth);
 
             const int timeAsInt = static_cast<int>(ImGui::GetTime() * 10.0);
 
