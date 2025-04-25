@@ -3,7 +3,7 @@
 
 ImSearch is an immediate mode extension for [Dear ImGui](https://github.com/ocornut/imgui), allowing you to create searchbars for ImGui's buttons, trees, selectable, and every other widget you can imagine.
 
-Just like ImGui, ImSearch's API does not burden the end user with state management, use STL containers or include any C++ headers, and has no public dependencies except for ImGui itself.
+Just like ImGui, ImSearch's API does not burden the end user with state management, use STL containers or include any C++ headers, and has no public dependencies except for ImGui itself. This extension is compatible with C++11 and above.
 
 ## Examples
 
