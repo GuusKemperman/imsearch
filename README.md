@@ -10,11 +10,24 @@ Just like ImGui, ImSearch's API does not burden the end user with state manageme
 <table>
   <tr>
     <th><img src="https://github.com/user-attachments/assets/3b2a9d01-7791-42cf-8df6-40eb2e26d0df"><p>Combos</p> </th>
-    <th><img src="https://github.com/user-attachments/assets/4680dc71-ffc5-42cd-aef5-bbacaf120541"><p>Hierarchies; ideal for content browsers, file explorers, or scene outliners</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/4680dc71-ffc5-42cd-aef5-bbacaf120541"><p>Hierarchies</p> </th>
   </tr>
   <tr>
     <th><img src="https://github.com/user-attachments/assets/c35471fe-8572-4238-a238-48d9a840ebb2"><p>Collapsing headers and nested search bars</p></th>
     <th><img src="https://github.com/user-attachments/assets/041394e7-e145-4df8-84e8-7a8ecb2e8371"><p>Custom search bars</p> </th>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <th colspan = "3">
+      <h3>Real world examples from <a href="https://github.com/GuusKemperman/CoralEngine">Coral Engine</a></h3>
+    </th>
+  <tr>
+  <tr>
+    <th><img src="https://github.com/user-attachments/assets/4659ab77-0265-4acf-8979-673e276e9fef"><p>World outliner, details panel, and asset selection</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/cc800604-d50c-4429-9f11-f8db91d12cfc"><p>Content browser</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/9c30763d-5c10-4275-8b57-7f2ac7a1a891"><p>Finding functions and types for easier scripting</p> </th>
   </tr>
 </table>
 
