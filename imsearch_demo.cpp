@@ -1,6 +1,7 @@
 #ifndef IMGUI_DISABLE
 
 #include "imsearch.h"
+#include "imsearch_internal.h"
 #include "imgui.h"
 
 #include <chrono>
@@ -804,81 +805,6 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             }
 
             ImSearch::EndSearch();
-        }
-
-        ImGui::TreePop();
-    }
-
-    if (ImGui::TreeNode("Benchmark"))
-    {
-        static int amount = 100000;
-        static int numFrames = 10;
-
-        ImGui::InputInt("Number of items", &amount);
-        ImGui::InputInt("Number of frames", &numFrames);
-
-        static int numFramesSinceStarted = numFrames;
-        static std::string randomUserQuery{};
-        static size_t benchmarkSeed = 0xF3F50E36;
-        static float firstFrameDuration{};
-        static float totalDuration{};
-
-        if (ImGui::Button("Run!"))
-        {
-            randomUserQuery = GetRandomString(benchmarkSeed, str);
-            numFramesSinceStarted = 0;
-            Rand(benchmarkSeed);
-            firstFrameDuration = 0.0f;
-            totalDuration = 0.0f;
-        }
-
-        if (numFramesSinceStarted < numFrames)
-        {
-            std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-            std::chrono::high_resolution_clock::time_point t2{};
-
-            if (ImSearch::BeginSearch())
-            {
-                if (numFramesSinceStarted == 0)
-                {
-                    ImSearch::SetUserQuery(randomUserQuery.c_str());
-                }
-
-                for (int i = 0; i < amount; i++)
-                {
-                    ImSearch::SearchableItem(GetRandomString(benchmarkSeed, str), [](const char*) {});
-                }
-
-                ImSearch::EndSearch();
-            }
-
-            t2 = std::chrono::high_resolution_clock::now();
-            float deltaTime = std::chrono::duration_cast<std::chrono::duration<float>>(t2 - t1).count();
-
-            t1 = t2;
-
-            if (numFramesSinceStarted == 0)
-            {
-                firstFrameDuration = deltaTime;
-            }
-            totalDuration += deltaTime;
-        }
-
-        numFramesSinceStarted++;
-        const float avg = totalDuration / static_cast<float>(std::min(numFramesSinceStarted, numFrames));
-
-        std::string result{};
-
-        result += "Frames: " + std::to_string(std::min(numFramesSinceStarted, numFrames)) + '/' + std::to_string(numFrames) + "\n";
-        result += "First frame: " + std::to_string(firstFrameDuration) + "\n";
-        result += "Total duration: " + std::to_string(totalDuration) + "\n";
-        result += "Avg duration: " + std::to_string(avg) + "\n";
-
-        ImGui::TextUnformatted(result.c_str());
-
-        if (ImGui::Button("Copy result"))
-        {
-            ImGui::SetClipboardText(result.c_str());
         }
 
         ImGui::TreePop();

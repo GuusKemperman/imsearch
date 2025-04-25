@@ -780,4 +780,31 @@ namespace
 		ImGui::PopID();
 	}
 }
+
+float ImSearch::Internal::GetScore(size_t index)
+{
+	LocalContext& context = GetLocalContext();
+	auto& scores = context.mResult.mBuffers.mScores;
+
+	if (index < 0
+		|| index >= scores.size())
+	{
+		return -1.0f;
+	}
+	return scores[index];
+}
+
+size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
+{
+	LocalContext& context = GetLocalContext();
+	auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
+
+	if (index < 0
+		|| index >= displayOrder.size())
+	{
+		return std::numeric_limits<size_t>::max();
+	}
+	return displayOrder[index];
+}
+
 #endif // #ifndef IMGUI_DISABLE
