@@ -82,6 +82,7 @@ namespace
 	struct Input
 	{
 		std::vector<Searchable> mEntries{};
+		std::vector<float> mBonuses{};
 		std::string mUserQuery{};
 	};
 
@@ -141,10 +142,16 @@ namespace
 
 	LocalContext& GetLocalContext();
 	ImSearch::ImSearchContext& GetImSearchContext();
+	IndexT GetCurrentItem(LocalContext& context);
 
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
 	void BringResultUpToDate(Result& result);
 	void DisplayToUser(const LocalContext& context, const Result& result);
+
+	bool CanCollectSubmissions();
+
+	bool operator==(const Searchable& lhs, const Searchable& rhs);
+	bool operator==(const Input& lhs, const Input& rhs);
 }
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
@@ -312,15 +319,40 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 
 void ImSearch::PopSearchable()
 {
-	if (*GetUserQuery() == '\0')
+	if (!CanCollectSubmissions())
 	{
-		// Invoke the callback immediately if the user
-		// is not actively searching, for performance
-		// and memory reasons.
 		return;
 	}
 
 	Internal::PopSearchable(nullptr, nullptr);
+}
+
+void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
+{
+	LocalContext& context = GetLocalContext();
+	const IndexT indexOfCurrentCategory = GetCurrentItem(context);
+
+	if (functor != nullptr
+		&& vTable != nullptr)
+	{
+		context.mDisplayCallbacks[indexOfCurrentCategory].mOnDisplayEnd = VTableFunctor{ functor, vTable };
+	}
+
+	context.mPushStack.pop();
+}
+
+void ImSearch::SetRelevancyBonus(float bonus)
+{
+	if (!CanCollectSubmissions())
+	{
+		return;
+	}
+
+	LocalContext& context = GetLocalContext();
+	const IndexT indexOfCurrentCategory = GetCurrentItem(context);
+
+	context.mInput.mBonuses.resize(indexOfCurrentCategory + 1);
+	context.mInput.mBonuses[indexOfCurrentCategory] = bonus;
 }
 
 void ImSearch::SetUserQuery(const char* query)
@@ -333,23 +365,6 @@ const char* ImSearch::GetUserQuery()
 {
 	LocalContext& context = GetLocalContext();
 	return context.mInput.mUserQuery.c_str();
-}
-
-void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
-{
-	LocalContext& context = GetLocalContext();
-
-	IM_ASSERT(!context.mHasSubmitted && "Tried calling PopSearchable after EndSearch or Submit");
-
-	const size_t indexOfCurrentCategory = context.mPushStack.top();
-
-	if (functor != nullptr
-		&& vTable != nullptr)
-	{
-		context.mDisplayCallbacks[indexOfCurrentCategory].mOnDisplayEnd = VTableFunctor{ functor, vTable };
-	}
-
-	context.mPushStack.pop();
 }
 
 namespace
@@ -437,31 +452,16 @@ namespace
 		return *context;
 	}
 
+	IndexT GetCurrentItem(LocalContext& context)
+	{
+		IM_ASSERT(!context.mPushStack.empty() && "No active object; can only be called after PushSearchable");
+		IM_ASSERT(!context.mHasSubmitted && "No active object; Submit (or EndSearch) has already been called");
+		return context.mPushStack.top();
+	}
+
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput)
 	{
-		const Input& oldInput = oldResult.mInput;
-
-		if (oldInput.mUserQuery != currentInput.mUserQuery
-			|| oldInput.mEntries.size() != currentInput.mEntries.size())
-		{
-			return false;
-		}
-
-		// C++11 didn't have nice algorithms for comparing ranges :(
-		for (size_t i = 0; i < oldInput.mEntries.size(); i++)
-		{
-			const Searchable& oldEntry = oldInput.mEntries[i];
-			const Searchable& newEntry = currentInput.mEntries[i];
-			if (oldEntry.mText != newEntry.mText
-				|| oldEntry.mIndexOfFirstChild != newEntry.mIndexOfFirstChild
-				|| oldEntry.mIndexOfLastChild != newEntry.mIndexOfLastChild
-				|| oldEntry.mIndexOfParent != newEntry.mIndexOfParent
-				|| oldEntry.mIndexOfNextSibling != newEntry.mIndexOfNextSibling)
-			{
-				return false;
-			}
-		}
-		return true;
+		return oldResult.mInput == currentInput;
 	}
 
 	std::vector<std::string> TokeniseAndSort(const std::string& s)
@@ -614,12 +614,6 @@ namespace
 		buffers.mScores.clear();
 		buffers.mScores.resize(input.mEntries.size());
 
-		if (input.mUserQuery.empty())
-		{
-			std::fill(buffers.mScores.begin(), buffers.mScores.end(), 1.0f);
-			return;
-		}
-
 		const std::string& processedQuery = MakePreprocessedString(input.mUserQuery);
 
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
@@ -628,7 +622,13 @@ namespace
 
 			const int ratio = PartialTokenSortRatio(processedQuery, text, buffers);
 
-			const float score = static_cast<float>(ratio) / 100.0f;
+			float score = static_cast<float>(ratio) / 100.0f;
+
+			if (i < static_cast<IndexT>(input.mBonuses.size()))
+			{
+				score += input.mBonuses[i];
+			}
+
 			buffers.mScores[i] = score;
 		}
 	}
@@ -798,6 +798,29 @@ namespace
 		}
 
 		ImGui::PopID();
+	}
+
+	bool CanCollectSubmissions()
+	{
+		// ImSearch does not store anything the programmer is submitting if the user
+		// is not actively searching, for performance and memory reasons.
+		return *ImSearch::GetUserQuery() != '\0';
+	}
+
+	bool operator==(const Searchable& lhs, const Searchable& rhs)
+	{
+		return lhs.mText == rhs.mText
+			&& lhs.mIndexOfFirstChild == rhs.mIndexOfFirstChild
+			&& lhs.mIndexOfLastChild == rhs.mIndexOfLastChild
+			&& lhs.mIndexOfParent == rhs.mIndexOfParent
+			&& lhs.mIndexOfNextSibling == rhs.mIndexOfNextSibling;
+	}
+
+	bool operator==(const Input& lhs, const Input& rhs)
+	{
+		return lhs.mUserQuery == rhs.mUserQuery
+			&& lhs.mEntries == rhs.mEntries
+			&& lhs.mBonuses == rhs.mBonuses;
 	}
 }
 

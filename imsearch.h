@@ -150,6 +150,28 @@ namespace ImSearch
 	void PopSearchable(T&& callback);
 
 	//-----------------------------------------------------------------------------
+	// [SECTION] Modifiers
+	//-----------------------------------------------------------------------------
+
+	// You can artificially increase the relevancy for items you think might
+	// be more likely to be what the user is looking for.
+	//
+	// You could, for example, give priority to more commonly referenced functions:
+	//
+	//	if (ImSearch::PushSearchable(func.name, &DisplayFuncWidget))
+	//	{
+	//		float frequency = func.timesUsedInCodebase / gTotalFunctionsUsedInCodeBase;
+	//		ImSearch::SetRelevancyBonus(frequency);
+	//		ImSearch::PopSearchable();
+	//	}
+	//
+	// ImSearch places no restrictions on the range of your provided bonus,
+	// but keep in mind the 'default' relevancy of items, as scored by ImSearch,
+	// is within the range of 0.0f to 1.0f. Normalization is encouraged, to avoid
+	// your bonus dwarfing the similarity score of the text.
+	void SetRelevancyBonus(float bonus);
+
+	//-----------------------------------------------------------------------------
 	// [SECTION] Searchbars
 	//-----------------------------------------------------------------------------
 

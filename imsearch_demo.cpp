@@ -810,6 +810,57 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         ImGui::TreePop();
     }
 
+    if (ImGui::TreeNode("Artificially increasing priority for popular items"))
+    {
+        if (ImSearch::BeginSearch())
+        {
+            HelpMarker(
+                "A bonus can be applied which, ONLY when the user is searching,\n"
+				"influences which items are shown to the user first.\n\n"
+				"Gus Goose is textually irrelevant, but because of his high\n"
+				"bonus, he is the first result.");
+            ImSearch::SearchBar();
+            [[maybe_unused]] static char doOnceDummy = [] { ImSearch::SetUserQuery("Duck"); return 0; }();
+
+			static std::array<std::pair<const char*, float>, 15> namesAndBonuses
+			{
+			    std::pair<const char*, float>{ "Scrooge McDuck", 0.95f },             
+			    std::pair<const char*, float>{ "Della Duck", 0.88f },                 
+			    std::pair<const char*, float>{ "Huey Dewey & Louie Duck", 0.93f },    
+			    std::pair<const char*, float>{ "Donald Duck", 1.0f },     
+			    std::pair<const char*, float>{ "Grandma Duck", 0.82f },
+
+			    std::pair<const char*, float>{ "Gus Goose", 5.0f },
+			    std::pair<const char*, float>{ "Sir Quackly McDuck", 0.68f },         
+			    std::pair<const char*, float>{ "Fethry Duck", 0.75f },                
+			    std::pair<const char*, float>{ "Dugan Duck", 0.65f },                 
+			    std::pair<const char*, float>{ "Sir Roast McDuck", 0.42f },            
+			    std::pair<const char*, float>{ "Dudly D. Duck", 0.45f },              
+			    std::pair<const char*, float>{ "Matilda McDuck", 0.58f },
+			    std::pair<const char*, float>{ "Donna Duck", 0.55f },                 
+			    std::pair<const char*, float>{ "Pothole McDuck", 0.52f },             
+			    std::pair<const char*, float>{ "Daphne Duck-Gander", 0.60f },         
+			};
+
+            for (auto& nameAndBonus : namesAndBonuses)
+            {
+                if (ImSearch::PushSearchable(nameAndBonus.first,
+                    [&](const char* name)
+                    {
+                        ImGui::SliderFloat(name, &nameAndBonus.second, -1.0f, 1.0f);
+                        return true;
+                    }))
+                {
+                    ImSearch::SetRelevancyBonus(nameAndBonus.second);
+                    ImSearch::PopSearchable();
+                }
+            }
+
+            ImSearch::EndSearch();
+        }
+        ImGui::TreePop();
+    }
+
 	ImGui::End();
 }
 
