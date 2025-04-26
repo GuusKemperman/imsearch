@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <numeric>
 #include <limits>
+#include <cctype>
 
 namespace
 {
@@ -87,7 +88,7 @@ namespace
 	struct ReusableBuffers
 	{
 		std::vector<float> mScores{};
-		std::vector<IndexT> mIndicesToAddToDisplayOrder{};
+		std::vector<IndexT> mTempIndices{};
 	};
 
 	struct Output
@@ -127,6 +128,7 @@ namespace ImSearch
 	{
 		std::unordered_map<ImGuiID, LocalContext> Contexts{};
 		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
+		std::unordered_map<std::string, std::string> mPreprocessedStrings{};
 	};
 }
 
@@ -458,6 +460,151 @@ namespace
 		return true;
 	}
 
+	std::vector<std::string> TokeniseAndSort(const std::string& s)
+	{
+		std::vector<std::string> tokens{};
+		std::string current{};
+		for (char c : s)
+		{
+			if (std::isalnum(static_cast<unsigned char>(c)))
+			{
+				current += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+				continue;
+			}
+
+			if (!current.empty())
+			{
+				tokens.push_back(current);
+				current.clear();
+			}
+		}
+
+		if (!current.empty())
+		{
+			tokens.push_back(current);
+		}
+		std::sort(tokens.begin(), tokens.end());
+		return tokens;
+	}
+
+	std::string Join(const std::vector<std::string>& tokens)
+	{
+		if (tokens.empty())
+		{
+			return {};
+		}
+
+		std::string res = tokens[0];
+		for (size_t i = 1; i < tokens.size(); i++)
+		{
+			res += ' ' + tokens[i];
+		}
+		return res;
+	}
+
+	int LevenshteinDistance(const char* s1, 
+		const int s1Size, 
+		const char* s2, 
+		const int s2Size, 
+		ReusableBuffers& buffers)
+	{
+		const int matWidth = s1Size + 1;
+		const int matHeight = s2Size + 1;
+
+		std::vector<IndexT>& dp = buffers.mTempIndices;
+		buffers.mTempIndices.resize(matWidth * matHeight);
+
+		for (int x = 0; x < matWidth; x++)
+		{
+			dp[x] = x;
+			
+		}
+		for (int y = 0; y < matHeight; y++)
+		{
+			dp[y * matWidth] = y;
+		}
+
+		for (int x = 1; x < matWidth; x++)
+		{
+			for (int y = 1; y < matHeight; y++)
+			{
+				const int cost = (s1[x - 1] == s2[y - 1]) ? 0 : 1;
+
+				dp[x + y * matWidth] =
+					std::min(
+						std::min(dp[(x - 1) + y * matWidth] + 1, dp[x + (y - 1) * matWidth] + 1),
+						dp[(x - 1) + (y - 1) * matWidth] + cost
+					);
+			}
+		}
+
+		return static_cast<int>(dp.back());
+	}
+
+	int PartialRatio(const std::string& s1, const std::string& s2, ReusableBuffers& buffers)
+	{
+		if (s1.empty()
+			|| s2.empty())
+		{
+			return 0;
+		}
+
+		const std::string& shorter = s1.size() <= s2.size() ? s1 : s2;
+		const std::string& longer = (s1.size() <= s2.size()) ? s2 : s1;
+
+		const int shorterSize = static_cast<int>(shorter.size());
+		const int longerSize = static_cast<int>(longer.size());
+
+		int max_ratio = 0;
+		for (int i = 0; i <= longerSize - shorterSize; i++)
+		{
+			const char* windowPos = &longer[i];
+			const int windowSize = std::min(longerSize - i, shorterSize);
+
+			const int distance = LevenshteinDistance(shorter.c_str(), 
+				shorterSize, 
+				windowPos,
+				windowSize,
+				buffers);
+			const int ratio = static_cast<int>((1.0 - static_cast<double>(distance) / shorterSize) * 100);
+
+			max_ratio = std::max(max_ratio, ratio);
+
+			if (max_ratio == 100)
+			{
+				break;
+			}
+		}
+		return max_ratio;
+	}
+
+	std::string MakePreprocessedString(const std::string& original)
+	{
+		const std::vector<std::string> targetTokens = TokeniseAndSort(original);
+		std::string processedTarget = Join(targetTokens);
+		return processedTarget;
+	}
+
+	const std::string& GetPreprocessedString(const std::string& original)
+	{
+		ImSearch::ImSearchContext& context = GetImSearchContext();
+		auto& preprocessedStrings = context.mPreprocessedStrings;
+
+		auto it = context.mPreprocessedStrings.find(original);
+
+		if (it == preprocessedStrings.end())
+		{
+			it = preprocessedStrings.emplace(original, MakePreprocessedString(original)).first;
+		}
+
+		return it->second;
+	}
+
+	int PartialTokenSortRatio(const std::string& processedUserQuery, const std::string& target, ReusableBuffers& buffers)
+	{
+		return PartialRatio(processedUserQuery, GetPreprocessedString(target), buffers);
+	}
+
 	void AssignInitialScores(const Input& input, ReusableBuffers& buffers)
 	{
 		buffers.mScores.clear();
@@ -469,13 +616,15 @@ namespace
 			return;
 		}
 
-		ImSearch::StringMatcher matcher{ input.mUserQuery.c_str() };
+		const std::string& processedQuery = MakePreprocessedString(input.mUserQuery);
 
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
 			const std::string& text = input.mEntries[i].mText;
 
-			const float score = matcher(text.c_str());
+			const int ratio = PartialTokenSortRatio(processedQuery, text, buffers);
+
+			const float score = static_cast<float>(ratio) / 100.0f;
 			buffers.mScores[i] = score;
 		}
 	}
@@ -527,8 +676,8 @@ namespace
 		IndexT endInIndicesBuffer,
 		Output& output)
 	{
-		std::stable_sort(buffers.mIndicesToAddToDisplayOrder.begin() + startInIndicesBuffer,
-			buffers.mIndicesToAddToDisplayOrder.begin() + endInIndicesBuffer,
+		std::stable_sort(buffers.mTempIndices.begin() + startInIndicesBuffer,
+			buffers.mTempIndices.begin() + endInIndicesBuffer,
 			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
 			{
 				const float lhsScore = buffers.mScores[lhsIndex];
@@ -539,9 +688,9 @@ namespace
 
 		for (IndexT indexInIndicesBuffer = startInIndicesBuffer; indexInIndicesBuffer < endInIndicesBuffer; indexInIndicesBuffer++)
 		{
-			IndexT searchableIndex = buffers.mIndicesToAddToDisplayOrder[indexInIndicesBuffer];
+			IndexT searchableIndex = buffers.mTempIndices[indexInIndicesBuffer];
 
-			const IndexT nextStartInIndicesBuffer = static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size());
+			const IndexT nextStartInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
 
 			output.mDisplayOrder.emplace_back(searchableIndex);
 
@@ -552,11 +701,11 @@ namespace
 			{
 				if (buffers.mScores[childIndex] >= sCutOffStrength)
 				{
-					buffers.mIndicesToAddToDisplayOrder.emplace_back(childIndex);
+					buffers.mTempIndices.emplace_back(childIndex);
 				}
 			}
 
-			const IndexT nextEndInIndicesBuffer = static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size());
+			const IndexT nextEndInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
 
 			AppendToDisplayOrder(input, 
 				buffers, 
@@ -571,21 +720,21 @@ namespace
 	void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
 	{
 		output.mDisplayOrder.clear();
-		buffers.mIndicesToAddToDisplayOrder.clear();
+		buffers.mTempIndices.clear();
 
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
 			if (input.mEntries[i].mIndexOfParent == sNullIndex
 				&& buffers.mScores[i] >= sCutOffStrength)
 			{
-				buffers.mIndicesToAddToDisplayOrder.emplace_back(i);
+				buffers.mTempIndices.emplace_back(i);
 			}
 		}
 
 		AppendToDisplayOrder(input, 
 			buffers,
 			0,
-			static_cast<IndexT>(buffers.mIndicesToAddToDisplayOrder.size()),
+			static_cast<IndexT>(buffers.mTempIndices.size()),
 			output);
 	}
 
@@ -648,33 +797,30 @@ namespace
 	}
 }
 
-ImSearch::StringMatcher::StringMatcher(const char* userQuery) :
-	mUserQuery(userQuery),
-	mUserLen(strlen(userQuery))
+float ImSearch::Internal::GetScore(size_t index)
 {
+	LocalContext& context = GetLocalContext();
+	auto& scores = context.mResult.mBuffers.mScores;
+
+	if (index < 0
+		|| index >= scores.size())
+	{
+		return -1.0f;
+	}
+	return scores[index];
 }
 
-float ImSearch::StringMatcher::operator()(const char* text_body) const
+size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
 {
-	if (mUserLen == 0)
-	{
-		return 1.0f;
-	}
+	LocalContext& context = GetLocalContext();
+	auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
 
-	size_t current = 0;
-	for (size_t i = 0; text_body[i] != '\0'; ++i)
+	if (index < 0
+		|| index >= displayOrder.size())
 	{
-		if (text_body[i] == mUserQuery[current])
-		{
-			current++;
-			if (current == mUserLen)
-			{
-				break;
-			}
-		}
+		return std::numeric_limits<size_t>::max();
 	}
-
-	return static_cast<float>(current) / static_cast<float>(mUserLen);
+	return displayOrder[index];
 }
 
 #endif // #ifndef IMGUI_DISABLE

@@ -1,8 +1,10 @@
 #ifndef IMGUI_DISABLE
 
 #include "imsearch.h"
+#include "imsearch_internal.h"
 #include "imgui.h"
 
+#include <chrono>
 #include <array>
 #include <string>
 #include <functional>

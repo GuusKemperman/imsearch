@@ -1,21 +1,19 @@
 #pragma once
 #ifndef IMGUI_DISABLE
-
 #include <cstddef>
 
 namespace ImSearch
 {
-    struct StringMatcher
-    {
-        StringMatcher(const char* userQuery);
+	namespace Internal
+	{
+		//-----------------------------------------------------------------------------
+		// [SECTION] Testing
+		//-----------------------------------------------------------------------------
 
-        float operator()(const char* textBody) const;
+		float GetScore(size_t index);
 
-    private:
-        const char* mUserQuery{};
-        size_t mUserLen{};
-    };
+		size_t GetDisplayOrderEntry(size_t index);
+	}
 }
-
 
 #endif // #ifndef IMGUI_DISABLE
