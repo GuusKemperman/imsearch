@@ -217,6 +217,14 @@ void ImSearch::SearchableItem(const char* name, T&& callback)
 template<typename T>
 bool ImSearch::PushSearchable(const char* name, T&& callback)
 {
+	if (*GetUserQuery() == '\0')
+	{
+		// Invoke the callback immediately if the user
+		// is not actively searching, for performance
+		// and memory reasons.
+		return callback(name);
+	}
+
 	using TNonRef = typename Internal::remove_reference<T>::type;
 	TNonRef moveable{ static_cast<decltype(callback)>(callback) };
 	return Internal::PushSearchable(
@@ -260,6 +268,15 @@ bool ImSearch::PushSearchable(const char* name, T&& callback)
 template<typename T>
 void ImSearch::PopSearchable(T&& callback)
 {
+	if (*GetUserQuery() == '\0')
+	{
+		// Invoke the callback immediately if the user
+		// is not actively searching, for performance
+		// and memory reasons.
+		(void)callback();
+		return;
+	}
+
 	using TNonRef = typename Internal::remove_reference<T>::type;
 	TNonRef moveable{ static_cast<decltype(callback)>(callback) };
 	Internal::PopSearchable(
