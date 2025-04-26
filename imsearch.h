@@ -171,6 +171,16 @@ namespace ImSearch
 	// your bonus dwarfing the similarity score of the text.
 	void SetRelevancyBonus(float bonus);
 
+	// You can add synonyms using the following syntax: 
+	//
+	//	if (ImSearch::PushSearchable("Function", selectableCallback))
+	//	{
+	//		ImSearch::AddSynonym("Method");
+	//		ImSearch::AddSynonym("Procedure");
+	//
+	//		ImSearch::PopSearchable();
+	//	}
+	//
 	void AddSynonym(const char* synonym);
 
 	//-----------------------------------------------------------------------------
