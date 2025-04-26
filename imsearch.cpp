@@ -145,12 +145,10 @@ namespace
 	IndexT GetCurrentItem(LocalContext& context);
 
 	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
-	void BringResultUpToDate(const LocalContext& context, Result& result);
+	void BringResultUpToDate(Result& result);
 	void DisplayToUser(const LocalContext& context, const Result& result);
 
 	bool CanCollectSubmissions();
-
-	bool IsSynonym(const LocalContext& context, IndexT index);
 
 	bool operator==(const Searchable& lhs, const Searchable& rhs);
 	bool operator==(const Input& lhs, const Input& rhs);
@@ -363,6 +361,13 @@ void ImSearch::AddSynonym(const char* synonym)
 	{
 		return;
 	}
+
+	// Ensure there is an active 'parent' item
+	// to add the synonym to; no point in adding
+	// synonyms at the root level, and if you did,
+	// you did something wrong.
+	LocalContext& context = GetLocalContext();
+	(void)GetCurrentItem(context);
 
 	if (Internal::PushSearchable(synonym, nullptr, nullptr))
 	{
@@ -736,7 +741,7 @@ namespace
 		}
 	}
 
-	void GenerateDisplayOrder(const LocalContext& context, const Input& input, ReusableBuffers& buffers, Output& output)
+	void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
 	{
 		output.mDisplayOrder.clear();
 		buffers.mTempIndices.clear();
@@ -744,8 +749,7 @@ namespace
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
 			if (input.mEntries[i].mIndexOfParent == sNullIndex
-				&& buffers.mScores[i] >= sCutOffStrength
-				&& !IsSynonym(context, i))
+				&& buffers.mScores[i] >= sCutOffStrength)
 			{
 				buffers.mTempIndices.emplace_back(i);
 			}
@@ -758,12 +762,12 @@ namespace
 			output);
 	}
 
-	void BringResultUpToDate(const LocalContext& context, Result& result)
+	void BringResultUpToDate(Result& result)
 	{
 		AssignInitialScores(result.mInput, result.mBuffers);
 		PropagateScoreToChildren(result.mInput, result.mBuffers);
 		PropagateScoreToParents(result.mInput, result.mBuffers);
-		GenerateDisplayOrder(context, result.mInput, result.mBuffers, result.mOutput);
+		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
 	}
 
 	void DisplayToUser(const LocalContext& context, const Result& result)
@@ -821,11 +825,6 @@ namespace
 		// ImSearch does not store anything the programmer is submitting if the user
 		// is not actively searching, for performance and memory reasons.
 		return *ImSearch::GetUserQuery() != '\0';
-	}
-
-	bool IsSynonym(const LocalContext& context, IndexT index)
-	{
-		return !context.mDisplayCallbacks[index].mOnDisplayStart;
 	}
 
 	bool operator==(const Searchable& lhs, const Searchable& rhs)
