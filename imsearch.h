@@ -259,8 +259,8 @@ bool ImSearch::PushSearchable(const char* name, T&& callback)
 			case 0: // Invoke
 			{
 				TNonRef* func = static_cast<TNonRef*>(ptr1);
-				const char* name = static_cast<const char*>(ptr2);
-				return (*func)(name);
+				const char* nameArg = static_cast<const char*>(ptr2);
+				return (*func)(nameArg);
 			}
 			case 1: // Move-construct
 			{
