@@ -129,7 +129,7 @@ namespace ImSearch
 	struct ImSearchContext
 	{
 		std::unordered_map<ImGuiID, LocalContext> Contexts{};
-		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
+		std::stack<std::reference_wrapper<LocalContext>> mContextStack{};
 		std::unordered_map<std::string, std::string> mPreprocessedStrings{};
 	};
 }
@@ -196,7 +196,7 @@ bool ImSearch::BeginSearch()
 
 	ImSearchContext& context = GetImSearchContext();
 	LocalContext& localContext = context.Contexts[imId];
-	context.ContextStack.emplace(localContext);
+	context.mContextStack.emplace(localContext);
 
 	localContext.mHasSubmitted = false;
 
@@ -267,6 +267,7 @@ void ImSearch::Submit()
 
 	DisplayToUser(context, lastValidResult);
 
+	context.mHasSubmitted = true;
 	context.mInput.mEntries.clear();
 	context.mDisplayCallbacks.clear();
 	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
@@ -284,7 +285,7 @@ void ImSearch::EndSearch()
 	ImGui::PopID();
 
 	ImSearch::ImSearchContext& context = GetImSearchContext();
-	context.ContextStack.pop();
+	context.mContextStack.pop();
 }
 
 bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
@@ -458,8 +459,8 @@ namespace
 	LocalContext& GetLocalContext()
 	{
 		ImSearch::ImSearchContext& ImSearchContext = GetImSearchContext();
-		IM_ASSERT(!ImSearchContext.ContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
-		return ImSearchContext.ContextStack.top();
+		IM_ASSERT(!ImSearchContext.mContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
+		return ImSearchContext.mContextStack.top();
 	}
 
 	ImSearch::ImSearchContext& GetImSearchContext()
