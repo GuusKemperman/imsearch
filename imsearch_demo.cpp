@@ -255,7 +255,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
             if (ImGui::BeginChild("Submissions", {}, ImGuiChildFlags_Borders))
             {
-                for (int i = 0; i < 1000; i++)
+                for (int i = 0; i < 10000; i++)
                 {
                     ImSearch::SearchableItem(GetRandomString(seed, randStr),
                         [](const char* str)
