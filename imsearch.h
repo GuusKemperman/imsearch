@@ -171,6 +171,8 @@ namespace ImSearch
 	// your bonus dwarfing the similarity score of the text.
 	void SetRelevancyBonus(float bonus);
 
+	void AddSynonym(const char* synonym);
+
 	//-----------------------------------------------------------------------------
 	// [SECTION] Searchbars
 	//-----------------------------------------------------------------------------
