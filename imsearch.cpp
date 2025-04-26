@@ -526,12 +526,11 @@ namespace
 			{
 				const int cost = (s1[x - 1] == s2[y - 1]) ? 0 : 1;
 
-				dp[x + y * matWidth] = 
-					std::min({
-						dp[(x - 1) + y * matWidth] + 1,
-						dp[x + (y - 1) * matWidth] + 1,
+				dp[x + y * matWidth] =
+					std::min(
+						std::min(dp[(x - 1) + y * matWidth] + 1, dp[x + (y - 1) * matWidth] + 1),
 						dp[(x - 1) + (y - 1) * matWidth] + cost
-					});
+					);
 			}
 		}
 
