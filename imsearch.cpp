@@ -267,6 +267,7 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 {
 	LocalContext& context = GetLocalContext();
 
+	IM_ASSERT(name != nullptr);
 	IM_ASSERT(!context.mHasSubmitted && "Tried calling PushSearchable after EndSearch or Submit");
 
 	context.mInput.mEntries.emplace_back();
@@ -311,6 +312,14 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 
 void ImSearch::PopSearchable()
 {
+	if (*GetUserQuery() == '\0')
+	{
+		// Invoke the callback immediately if the user
+		// is not actively searching, for performance
+		// and memory reasons.
+		return;
+	}
+
 	Internal::PopSearchable(nullptr, nullptr);
 }
 
@@ -322,13 +331,8 @@ void ImSearch::SetUserQuery(const char* query)
 
 const char* ImSearch::GetUserQuery()
 {
-	ImSearch::ImSearchContext& context = GetImSearchContext();
-
-	if (context.ContextStack.empty())
-	{
-		return nullptr;
-	}
-	return context.ContextStack.top().get().mInput.mUserQuery.c_str();
+	LocalContext& context = GetLocalContext();
+	return context.mInput.mUserQuery.c_str();
 }
 
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
