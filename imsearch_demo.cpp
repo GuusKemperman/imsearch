@@ -830,7 +830,6 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 			    std::pair<const char*, float>{ "Huey Dewey & Louie Duck", 0.93f },    
 			    std::pair<const char*, float>{ "Donald Duck", 1.0f },     
 			    std::pair<const char*, float>{ "Grandma Duck", 0.82f },
-
 			    std::pair<const char*, float>{ "Gus Goose", 5.0f },
 			    std::pair<const char*, float>{ "Sir Quackly McDuck", 0.68f },         
 			    std::pair<const char*, float>{ "Fethry Duck", 0.75f },                
