@@ -820,7 +820,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 				"Gus Goose is textually irrelevant, but because of his high\n"
 				"bonus, he is the first result.");
             ImSearch::SearchBar();
-            static char doOnceDummy = [] { ImSearch::SetUserQuery("Duck"); return 0; }();
+            static bool doOnceDummy = []{ ImSearch::SetUserQuery("Duck"); return true; }();
             (void)doOnceDummy;
 
 			static std::array<std::pair<const char*, float>, 15> namesAndBonuses
