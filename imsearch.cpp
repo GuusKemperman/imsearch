@@ -502,10 +502,14 @@ namespace
 		return res;
 	}
 
-	int LevenshteinDistance(const std::string& s1, const std::string& s2, ReusableBuffers& buffers)
+	int LevenshteinDistance(const char* s1, 
+		const int s1Size, 
+		const char* s2, 
+		const int s2Size, 
+		ReusableBuffers& buffers)
 	{
-		const int matWidth = static_cast<int>(s1.size()) + 1;
-		const int matHeight = static_cast<int>(s2.size()) + 1;
+		const int matWidth = s1Size + 1;
+		const int matHeight = s2Size + 1;
 
 		std::vector<IndexT>& dp = buffers.mTempIndices;
 		buffers.mTempIndices.resize(matWidth * matHeight);
@@ -554,8 +558,14 @@ namespace
 		int max_ratio = 0;
 		for (int i = 0; i <= longerSize - shorterSize; i++)
 		{
-			const std::string substring = longer.substr(i, shorterSize);
-			const int distance = LevenshteinDistance(shorter, substring, buffers);
+			const char* windowPos = &longer[i];
+			const int windowSize = std::min(longerSize - i, shorterSize);
+
+			const int distance = LevenshteinDistance(shorter.c_str(), 
+				shorterSize, 
+				windowPos,
+				windowSize,
+				buffers);
 			const int ratio = static_cast<int>((1.0 - static_cast<double>(distance) / shorterSize) * 100);
 
 			max_ratio = std::max(max_ratio, ratio);
