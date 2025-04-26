@@ -209,11 +209,11 @@ void ImSearch::SearchBar(const char* hint)
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
 
-	std::string& str = context.mInput.mUserQuery;
+	std::string& userQuery = context.mInput.mUserQuery;
 	ImGui::InputTextWithHint("##SearchBar",
 		hint,
-		const_cast<char*>(str.c_str()),
-		str.capacity() + 1,
+		const_cast<char*>(userQuery.c_str()),
+		userQuery.capacity() + 1,
 		ImGuiInputTextFlags_CallbackResize,
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
@@ -223,17 +223,17 @@ void ImSearch::SearchBar(const char* hint)
 				// Resize string callback
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
 				IM_ASSERT(data->Buf == str->c_str());
-				str->resize(data->BufTextLen);
+				str->resize(static_cast<size_t>(data->BufTextLen));
 				data->Buf = const_cast<char*>(str->c_str());
 			}
 			return 0;
 		},
-		&str);
+		&userQuery);
 
 	if (ImGui::IsWindowAppearing())
 	{
 		ImGui::SetKeyboardFocusHere();
-		str.clear();
+		userQuery.clear();
 	}
 }
 
@@ -507,32 +507,32 @@ namespace
 	}
 
 	int LevenshteinDistance(const char* s1, 
-		const int s1Size, 
+		const IndexT s1Size,
 		const char* s2, 
-		const int s2Size, 
+		const IndexT s2Size,
 		ReusableBuffers& buffers)
 	{
-		const int matWidth = s1Size + 1;
-		const int matHeight = s2Size + 1;
+		const IndexT matWidth = s1Size + 1;
+		const IndexT matHeight = s2Size + 1;
 
 		std::vector<IndexT>& dp = buffers.mTempIndices;
 		buffers.mTempIndices.resize(matWidth * matHeight);
 
-		for (int x = 0; x < matWidth; x++)
+		for (IndexT x = 0; x < matWidth; x++)
 		{
 			dp[x] = x;
 			
 		}
-		for (int y = 0; y < matHeight; y++)
+		for (IndexT y = 0; y < matHeight; y++)
 		{
 			dp[y * matWidth] = y;
 		}
 
-		for (int x = 1; x < matWidth; x++)
+		for (IndexT x = 1; x < matWidth; x++)
 		{
-			for (int y = 1; y < matHeight; y++)
+			for (IndexT y = 1; y < matHeight; y++)
 			{
-				const int cost = (s1[x - 1] == s2[y - 1]) ? 0 : 1;
+				const IndexT cost = (s1[x - 1] == s2[y - 1]) ? 0 : 1;
 
 				dp[x + y * matWidth] =
 					std::min(
@@ -556,14 +556,14 @@ namespace
 		const std::string& shorter = s1.size() <= s2.size() ? s1 : s2;
 		const std::string& longer = (s1.size() <= s2.size()) ? s2 : s1;
 
-		const int shorterSize = static_cast<int>(shorter.size());
-		const int longerSize = static_cast<int>(longer.size());
+		const IndexT shorterSize = static_cast<IndexT>(shorter.size());
+		const IndexT longerSize = static_cast<IndexT>(longer.size());
 
 		int max_ratio = 0;
-		for (int i = 0; i <= longerSize - shorterSize; i++)
+		for (IndexT i = 0; i <= longerSize - shorterSize; i++)
 		{
 			const char* windowPos = &longer[i];
-			const int windowSize = std::min(longerSize - i, shorterSize);
+			const IndexT windowSize = std::min(longerSize - i, shorterSize);
 
 			const int distance = LevenshteinDistance(shorter.c_str(), 
 				shorterSize, 
@@ -829,8 +829,7 @@ float ImSearch::Internal::GetScore(size_t index)
 	LocalContext& context = GetLocalContext();
 	auto& scores = context.mResult.mBuffers.mScores;
 
-	if (index < 0
-		|| index >= scores.size())
+	if (index >= scores.size())
 	{
 		return -1.0f;
 	}
@@ -842,8 +841,7 @@ size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
 	LocalContext& context = GetLocalContext();
 	auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
 
-	if (index < 0
-		|| index >= displayOrder.size())
+	if (index >= displayOrder.size())
 	{
 		return std::numeric_limits<size_t>::max();
 	}

@@ -48,7 +48,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 	// Reuse the same string
 	// when generating random strings,
 	// to reduce heap allocations
-	std::string str{};
+	std::string randStr{};
 
 	if (ImGui::TreeNode("Basic"))
 	{
@@ -134,7 +134,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
             for (int i = 0; i < 3; i++)
             {
-                ImSearch::SearchableItem(GetRandomString(seed, str),
+                ImSearch::SearchableItem(GetRandomString(seed, randStr),
                     [](const char* str)
                     {
                         ImGui::Selectable(str);
@@ -183,8 +183,8 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 #ifdef HAS_CPP14 // C++11 didnt support lambda captures by value. 
             if (ImSearchDemo_CollapsingHeader("Lambdas and captures"))
         	{
-                const std::string tooltip = GetRandomString(seed, str);
-                ImSearch::SearchableItem(GetRandomString(seed, str),
+                const std::string tooltip = GetRandomString(seed, randStr);
+                ImSearch::SearchableItem(GetRandomString(seed, randStr),
                     // You can capture anything in the lambda you might need.
                     // The easiest way, works with any C++ lambda.
                     [=](const char* str)
@@ -257,7 +257,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             {
                 for (int i = 0; i < 1000; i++)
                 {
-                    ImSearch::SearchableItem(GetRandomString(seed, str),
+                    ImSearch::SearchableItem(GetRandomString(seed, randStr),
                         [](const char* str)
                         {
                             ImGui::TextUnformatted(str);
@@ -754,10 +754,10 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             if (ImSearchDemo_CollapsingHeader("StaticMeshComponent"))
             {
                 ImSearch::SearchableItem("Mesh",
-                    [](const char* name)
+                    [](const char* fieldName)
                     {
                         static const char* selectedString = nouns[0];
-                        if (ImGui::BeginCombo(name, selectedString))
+                        if (ImGui::BeginCombo(fieldName, selectedString))
                         {
                             if (ImSearch::BeginSearch())
                             {
@@ -765,12 +765,12 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                                 for (const char* noun : nouns)
                                 {
                                     ImSearch::SearchableItem(noun,
-                                        [&](const char* name)
+                                        [&](const char* meshName)
                                         {
-                                            const bool isSelected = name == selectedString;
-                                            if (ImGui::Selectable(name, isSelected))
+                                            const bool isSelected = meshName == selectedString;
+                                            if (ImGui::Selectable(meshName, isSelected))
                                             {
-                                                selectedString = name;
+                                                selectedString = meshName;
                                             }
                                             return true;
                                         });
@@ -902,18 +902,18 @@ namespace
     bool ImSearchDemo_TreeNode(const char* name)
     {
         return ImSearch::PushSearchable(name, 
-            [](const char* name)
+            [](const char* nodeName)
             {
-                return ImGui::TreeNode(name);
+                return ImGui::TreeNode(nodeName);
             });
     }
 
     void ImSearchDemo_TreeLeaf(const char* name)
     {
-        ImSearch::SearchableItem(name, 
-            [](const char* name)
+        ImSearch::SearchableItem(name,
+            [](const char* leafName)
             {
-                ImGui::Selectable(name);
+                ImGui::Selectable(leafName);
             });
     }
 
@@ -929,9 +929,9 @@ namespace
     bool ImSearchDemo_CollapsingHeader(const char* name)
     {
         return ImSearch::PushSearchable(name, 
-            [](const char* name)
+            [](const char* headerName)
             {
-                return ImGui::CollapsingHeader(name);
+                return ImGui::CollapsingHeader(headerName);
             });
     }
 }
