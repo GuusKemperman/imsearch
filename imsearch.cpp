@@ -95,6 +95,7 @@ namespace
 	struct Output
 	{
 		std::vector<IndexT> mDisplayOrder{};
+		IndexT mMostRecentPopularItem = sNullIndex;
 		static constexpr IndexT sDisplayEndFlag = static_cast<IndexT>(1) << static_cast<IndexT>(std::numeric_limits<IndexT>::digits - 1);
 	};
 
@@ -214,21 +215,37 @@ void ImSearch::SearchBar(const char* hint)
 		hint,
 		const_cast<char*>(str.c_str()),
 		str.capacity() + 1,
-		ImGuiInputTextFlags_CallbackResize,
+		ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion,
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
-			std::string* str = static_cast<std::string*>(data->UserData);
+			LocalContext* capturedContext = static_cast<LocalContext*>(data->UserData);
+			std::string& capturedStr = capturedContext->mInput.mUserQuery;
+
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 			{
 				// Resize string callback
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-				IM_ASSERT(data->Buf == str->c_str());
-				str->resize(data->BufTextLen);
-				data->Buf = const_cast<char*>(str->c_str());
+				IM_ASSERT(data->Buf == capturedStr.c_str());
+				capturedStr.resize(static_cast<size_t>(data->BufTextLen));
+				data->Buf = const_cast<char*>(capturedStr.c_str());
+			}
+			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+			{
+				const IndexT completionIndex = capturedContext->mResult.mOutput.mMostRecentPopularItem;
+
+				auto& entries = capturedContext->mResult.mInput.mEntries;
+
+				if (completionIndex < static_cast<IndexT>(entries.size()))
+				{
+					capturedStr = entries[completionIndex].mText;
+
+					data->DeleteChars(0, data->BufTextLen);
+					data->InsertChars(0, capturedStr.c_str(), capturedStr.c_str() + capturedStr.size());
+				}
 			}
 			return 0;
 		},
-		&str);
+		&context);
 
 	if (ImGui::IsWindowAppearing())
 	{
@@ -633,6 +650,22 @@ namespace
 		}
 	}
 
+	void StoreMostPopularItem(const ReusableBuffers& buffers, Output& output)
+	{
+		float highestScore = -std::numeric_limits<float>::infinity();
+		output.mMostRecentPopularItem = sNullIndex;
+
+		for (IndexT i = 0; i < static_cast<IndexT>(buffers.mScores.size()); i++)
+		{
+			const float score = buffers.mScores[i];
+			if (score > highestScore)
+			{
+				output.mMostRecentPopularItem = i;
+				highestScore = score;
+			}
+		}
+	}
+
 	void PropagateScoreToChildren(const Input& input, ReusableBuffers& buffers)
 	{
 		// Each node can only be the child of ONE parent.
@@ -745,6 +778,7 @@ namespace
 	void BringResultUpToDate(Result& result)
 	{
 		AssignInitialScores(result.mInput, result.mBuffers);
+		StoreMostPopularItem(result.mBuffers, result.mOutput);
 		PropagateScoreToChildren(result.mInput, result.mBuffers);
 		PropagateScoreToParents(result.mInput, result.mBuffers);
 		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
