@@ -848,7 +848,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                     [&](const char* name)
                     {
                         ImGui::SliderFloat(name, &nameAndBonus.second, -1.0f, 1.0f);
-                        return true;
+                        return false;
                     }))
                 {
                     ImSearch::SetRelevancyBonus(nameAndBonus.second);
@@ -858,6 +858,64 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
             ImSearch::EndSearch();
         }
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Synonyms"))
+    {
+        if (ImSearch::BeginSearch())
+        {
+            HelpMarker("ImSearch supports synonyms, useful, if no one can agree on a single name. "
+					   
+						"For example, \"Class\" has the synonyms \"Type\" and \"Struct\"."
+						"Try searching for \"Struct\"; you'll see \"Class\" rise up to the top!");
+            ImSearch::SearchBar();
+
+            auto selectableCallback = [](const char* name) { ImGui::Selectable(name); return false; };
+
+            if (ImSearch::PushSearchable("Branch", selectableCallback))
+            {
+                ImSearch::AddSynonym("If");
+                ImSearch::AddSynonym("Condition");
+
+	            ImSearch::PopSearchable();
+            }
+
+            if (ImSearch::PushSearchable("Function", selectableCallback))
+            {
+                ImSearch::AddSynonym("Method");
+                ImSearch::AddSynonym("Procedure");
+
+                ImSearch::PopSearchable();
+            }
+
+        	if (ImSearch::PushSearchable("Variable", selectableCallback))
+            {
+                ImSearch::AddSynonym("Identifier");
+                ImSearch::AddSynonym("Container");
+
+                ImSearch::PopSearchable();
+            }
+
+            if (ImSearch::PushSearchable("Array", selectableCallback))
+            {
+                ImSearch::AddSynonym("List");
+                ImSearch::AddSynonym("Collection");
+
+                ImSearch::PopSearchable();
+            }
+
+            if (ImSearch::PushSearchable("Class", selectableCallback))
+            {
+                ImSearch::AddSynonym("Type");
+                ImSearch::AddSynonym("Struct");
+
+                ImSearch::PopSearchable();
+            }
+
+            ImSearch::EndSearch();
+        }
+
         ImGui::TreePop();
     }
 

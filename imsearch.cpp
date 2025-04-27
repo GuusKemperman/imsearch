@@ -355,6 +355,26 @@ void ImSearch::SetRelevancyBonus(float bonus)
 	context.mInput.mBonuses[indexOfCurrentCategory] = bonus;
 }
 
+void ImSearch::AddSynonym(const char* synonym)
+{
+	if (!CanCollectSubmissions())
+	{
+		return;
+	}
+
+	// Ensure there is an active 'parent' item
+	// to add the synonym to; no point in adding
+	// synonyms at the root level, and if you did,
+	// you did something wrong.
+	LocalContext& context = GetLocalContext();
+	(void)GetCurrentItem(context);
+
+	if (Internal::PushSearchable(synonym, nullptr, nullptr))
+	{
+		PopSearchable();
+	}
+}
+
 void ImSearch::SetUserQuery(const char* query)
 {
 	LocalContext& context = GetLocalContext();
