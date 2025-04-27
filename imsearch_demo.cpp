@@ -55,15 +55,16 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 		if (ImSearch::BeginSearch())
 		{
             ImSearch::SearchBar();
+            ImSearch::SetUserQuery("Identif");
 
-            ImSearch::SearchableItem("Hey there!",
+            ImSearch::SearchableItem("If",
                 [](const char* name)
                 {
                     ImGui::Selectable(name);
                     return true;
                 });
 
-            ImSearch::SearchableItem("Howdy partner!",
+            ImSearch::SearchableItem("Identifier",
                 [](const char* name)
                 {
                     ImGui::Button(name);

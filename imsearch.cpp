@@ -129,7 +129,7 @@ namespace ImSearch
 	{
 		std::unordered_map<ImGuiID, LocalContext> Contexts{};
 		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
-		std::unordered_map<std::string, std::string> mPreprocessedStrings{};
+		std::unordered_map<std::string, std::string> mTokenSortedStrings{};
 	};
 }
 
@@ -526,7 +526,7 @@ namespace
 		return res;
 	}
 
-	int LevenshteinDistance(const char* s1, 
+	int LevenshteinDistance(const char* s1,
 		const IndexT s1Size,
 		const char* s2, 
 		const IndexT s2Size,
@@ -552,7 +552,9 @@ namespace
 		{
 			for (IndexT y = 1; y < matHeight; y++)
 			{
-				const IndexT cost = (s1[x - 1] == s2[y - 1]) ? 0 : 1;
+				const char c1 = static_cast<char>(std::tolower(static_cast<unsigned char>(s1[x - 1])));
+				const char c2 = static_cast<char>(std::tolower(static_cast<unsigned char>(s2[y - 1])));
+				const IndexT cost = (c1 == c2) ? 0 : 1;
 
 				dp[x + y * matWidth] =
 					std::min(
@@ -565,68 +567,89 @@ namespace
 		return static_cast<int>(dp.back());
 	}
 
-	int PartialRatio(const std::string& s1, const std::string& s2, ReusableBuffers& buffers)
+	float Ratio(const char* shorter,
+		const IndexT shorterSize,
+		const char* longer,
+		const IndexT longerSize,
+		ReusableBuffers& buffers)
 	{
-		if (s1.empty()
-			|| s2.empty())
+		IM_ASSERT(shorterSize <= longerSize);
+		const int distance = LevenshteinDistance(shorter,
+			shorterSize,
+			longer,
+			longerSize,
+			buffers);
+		const float ratio = 1.0f - static_cast<float>(distance) / static_cast<float>(shorterSize + longerSize);
+		return ratio;
+	}
+
+	float PartialRatio(const char* s1,
+		const IndexT s1Size,
+		const char* s2,
+		const IndexT s2Size,
+		ReusableBuffers& buffers)
+	{
+		if (s1Size == 0
+			|| s2Size == 0)
 		{
-			return 0;
+			return 0.0f;
 		}
 
-		const std::string& shorter = s1.size() <= s2.size() ? s1 : s2;
-		const std::string& longer = (s1.size() <= s2.size()) ? s2 : s1;
+		const char* shorter = s1Size <= s2Size ? s1 : s2;
+		const char* longer = s1Size <= s2Size ? s2 : s1;
 
-		const IndexT shorterSize = static_cast<IndexT>(shorter.size());
-		const IndexT longerSize = static_cast<IndexT>(longer.size());
+		const IndexT shorterSize = std::min(s1Size, s2Size);
+		const IndexT longerSize = std::max(s1Size, s2Size);
 
-		int max_ratio = 0;
+		//const float maxDist = static_cast<float>(2 * shorterSize);
+		float maxRatio = 0.0f;
 		for (IndexT i = 0; i <= longerSize - shorterSize; i++)
 		{
 			const char* windowPos = &longer[i];
-			const IndexT windowSize = std::min(longerSize - i, shorterSize);
+			const IndexT windowSize = shorterSize;
 
-			const int distance = LevenshteinDistance(shorter.c_str(), 
-				shorterSize, 
+			//const int dist = LevenshteinDistance(shorter,
+			//	shorterSize,
+			//	windowPos,
+			//	windowSize,
+			//	buffers);
+
+			//const float ratio = static_cast<float>(dist) / maxDist;
+			const float ratio = Ratio(shorter,
+				shorterSize,
 				windowPos,
 				windowSize,
 				buffers);
-			const int ratio = static_cast<int>((1.0 - static_cast<double>(distance) / shorterSize) * 100);
+			maxRatio = std::max(maxRatio, ratio);
 
-			max_ratio = std::max(max_ratio, ratio);
-
-			if (max_ratio == 100)
+			if (maxRatio >= 1.0f)
 			{
 				break;
 			}
 		}
-		return max_ratio;
+		return maxRatio;
 	}
 
-	std::string MakePreprocessedString(const std::string& original)
+	std::string MakeTokenSortedString(const std::string& original)
 	{
 		const std::vector<std::string> targetTokens = TokeniseAndSort(original);
 		std::string processedTarget = Join(targetTokens);
 		return processedTarget;
 	}
 
-	const std::string& GetPreprocessedString(const std::string& original)
+	const std::string& GetTokenSortedString(const std::string& original)
 	{
 		ImSearch::ImSearchContext& context = GetImSearchContext();
-		auto& preprocessedStrings = context.mPreprocessedStrings;
+		auto& preprocessedStrings = context.mTokenSortedStrings;
 
-		auto it = context.mPreprocessedStrings.find(original);
+		auto it = context.mTokenSortedStrings.find(original);
 
 		if (it == preprocessedStrings.end())
 		{
-			it = preprocessedStrings.emplace(original, MakePreprocessedString(original)).first;
+			it = preprocessedStrings.emplace(original, MakeTokenSortedString(original)).first;
 		}
 
 		return it->second;
-	}
-
-	int PartialTokenSortRatio(const std::string& processedUserQuery, const std::string& target, ReusableBuffers& buffers)
-	{
-		return PartialRatio(processedUserQuery, GetPreprocessedString(target), buffers);
 	}
 
 	void AssignInitialScores(const Input& input, ReusableBuffers& buffers)
@@ -634,15 +657,53 @@ namespace
 		buffers.mScores.clear();
 		buffers.mScores.resize(input.mEntries.size());
 
-		const std::string& processedQuery = MakePreprocessedString(input.mUserQuery);
+		const std::string& tokenSortedQuery = MakeTokenSortedString(input.mUserQuery);
+
+		const char* queryCStr = input.mUserQuery.c_str();
+		const IndexT querySize = static_cast<IndexT>(input.mUserQuery.size());
+
+		const char* tokenQueryCStr = tokenSortedQuery.c_str();
+		const IndexT tokenQuerySize = static_cast<IndexT>(tokenSortedQuery.size());
 
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
-			const std::string& text = input.mEntries[i].mText;
+			const std::string& entryStr = input.mEntries[i].mText;
 
-			const int ratio = PartialTokenSortRatio(processedQuery, text, buffers);
+			const char* entryCStr = entryStr.c_str();
+			const IndexT entrySize = static_cast<IndexT>(entryStr.size());
 
-			float score = static_cast<float>(ratio) / 100.0f;
+			const std::string& tokenSortedEntry = GetTokenSortedString(entryStr);
+			const char* tokenEntryCStr = tokenSortedEntry.c_str();
+			const IndexT tokenEntrySize = static_cast<IndexT>(tokenSortedEntry.size());
+
+			const char* shorter = querySize <= entrySize ? queryCStr : entryCStr;
+			const char* longer = querySize <= entrySize ? entryCStr : queryCStr;
+
+			const IndexT shorterSize = std::min(querySize, entrySize);
+			const IndexT longerSize = std::max(querySize, entrySize);
+
+			const char* shorterToken = tokenQuerySize <= tokenEntrySize ? tokenQueryCStr : tokenEntryCStr;
+			const char* longerToken = tokenQuerySize <= tokenEntrySize ? tokenEntryCStr : tokenQueryCStr;
+
+			const IndexT shorterTokenSize = std::min(tokenQuerySize, tokenEntrySize);
+			const IndexT longerTokenSize = std::max(tokenQuerySize, tokenEntrySize);
+
+			float score = Ratio(shorter, shorterSize, longer, longerSize, buffers);
+
+			if (longerSize <= shorterSize + shorterSize / 2)
+			{
+				score = std::max(score,
+					Ratio(shorterToken, shorterTokenSize, longerToken, longerTokenSize, buffers) * 0.95f);
+			}
+			else
+			{
+				const float weight = longerSize > shorterSize * 8 ? 0.5f : .8f;
+
+				score = std::max(score, PartialRatio(shorter, shorterSize, longer, longerSize, buffers) * weight);
+
+				score = std::max(score,
+					PartialRatio(shorterToken, shorterTokenSize, longerToken, longerTokenSize, buffers) * 0.95f * weight);
+			}
 
 			if (i < static_cast<IndexT>(input.mBonuses.size()))
 			{
