@@ -292,16 +292,16 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                 {
                     if (ImSearchDemo_TreeNode("Tools"))
                     {
-                        ImSearchDemo_TreeLeaf("Hoe, for tilling soil and removing weeds.");
-                        ImSearchDemo_TreeLeaf("Sickle, for cutting crops like wheat or grass.");
-                        ImSearchDemo_TreeLeaf("Plow, for turning and loosening soil before planting.");
-                        ImSearchDemo_TreeLeaf("Wheelbarrow, for transporting soil, crops, and tools.");
-                        ImSearchDemo_TreeLeaf("Rake, for leveling soil or gathering leaves and hay.");
-                        ImSearchDemo_TreeLeaf("Pitchfork, for moving hay, compost, or manure.");
-                        ImSearchDemo_TreeLeaf("Scythe, a long-handled tool for mowing grass or reaping crops.");
-                        ImSearchDemo_TreeLeaf("Hand Trowel, for small digging jobs like planting.");
-                        ImSearchDemo_TreeLeaf("Pruning Shears, for trimming plants and branches.");
-                        ImSearchDemo_TreeLeaf("Seed Drill, for planting seeds at consistent depth and spacing.");
+                        ImSearchDemo_TreeLeaf("Hoe");
+                        ImSearchDemo_TreeLeaf("Sickle");
+                        ImSearchDemo_TreeLeaf("Plow");
+                        ImSearchDemo_TreeLeaf("Wheelbarrow");
+                        ImSearchDemo_TreeLeaf("Rake");
+                        ImSearchDemo_TreeLeaf("Pitchfork");
+                        ImSearchDemo_TreeLeaf("Scythe");
+                        ImSearchDemo_TreeLeaf("Hand Trowel");
+                        ImSearchDemo_TreeLeaf("Pruning Shears");
+                        ImSearchDemo_TreeLeaf("Seed Drill");
                         ImSearchDemo_TreePop();
                     }
                     if (ImSearchDemo_TreeNode("Crops"))
