@@ -5,7 +5,6 @@
 #include "imgui.h"
 
 #include <memory>
-#include <vector>
 #include <string>
 #include <stack>
 #include <algorithm>
@@ -15,11 +14,10 @@
 #include <limits>
 #include <cctype>
 
+using namespace ImSearch;
+
 namespace
 {
-	using IndexT = std::uint32_t;
-
-	constexpr IndexT sNullIndex = std::numeric_limits<IndexT>::max();
 
 	// Here is why we are using VTables instead of just std::function:
 	// std::function's SBO optimisation means it might consume
@@ -86,12 +84,6 @@ namespace
 		std::string mUserQuery{};
 	};
 
-	struct ReusableBuffers
-	{
-		std::vector<float> mScores{};
-		std::vector<IndexT> mTempIndices{};
-	};
-
 	struct Output
 	{
 		std::vector<IndexT> mDisplayOrder{};
@@ -138,7 +130,7 @@ namespace
 	ImSearch::ImSearchContext* sContext{};
 
 	// Anything below this score is not displayed to the user.
-	constexpr float sCutOffStrength = .3f;
+	constexpr float sCutOffStrength = .5f;
 
 	LocalContext& GetLocalContext();
 	ImSearch::ImSearchContext& GetImSearchContext();
@@ -526,110 +518,6 @@ namespace
 		return res;
 	}
 
-	int LevenshteinDistance(const char* s1,
-		const IndexT s1Size,
-		const char* s2, 
-		const IndexT s2Size,
-		ReusableBuffers& buffers)
-	{
-		const IndexT matWidth = s1Size + 1;
-		const IndexT matHeight = s2Size + 1;
-
-		std::vector<IndexT>& dp = buffers.mTempIndices;
-		buffers.mTempIndices.resize(matWidth * matHeight);
-
-		for (IndexT x = 0; x < matWidth; x++)
-		{
-			dp[x] = x;
-			
-		}
-		for (IndexT y = 0; y < matHeight; y++)
-		{
-			dp[y * matWidth] = y;
-		}
-
-		for (IndexT x = 1; x < matWidth; x++)
-		{
-			for (IndexT y = 1; y < matHeight; y++)
-			{
-				const char c1 = static_cast<char>(std::tolower(static_cast<unsigned char>(s1[x - 1])));
-				const char c2 = static_cast<char>(std::tolower(static_cast<unsigned char>(s2[y - 1])));
-				const IndexT cost = (c1 == c2) ? 0 : 1;
-
-				dp[x + y * matWidth] =
-					std::min(
-						std::min(dp[(x - 1) + y * matWidth] + 1, dp[x + (y - 1) * matWidth] + 1),
-						dp[(x - 1) + (y - 1) * matWidth] + cost
-					);
-			}
-		}
-
-		return static_cast<int>(dp.back());
-	}
-
-	float Ratio(const char* shorter,
-		const IndexT shorterSize,
-		const char* longer,
-		const IndexT longerSize,
-		ReusableBuffers& buffers)
-	{
-		IM_ASSERT(shorterSize <= longerSize);
-		const int distance = LevenshteinDistance(shorter,
-			shorterSize,
-			longer,
-			longerSize,
-			buffers);
-		const float ratio = 1.0f - static_cast<float>(distance) / static_cast<float>(shorterSize + longerSize);
-		return ratio;
-	}
-
-	float PartialRatio(const char* s1,
-		const IndexT s1Size,
-		const char* s2,
-		const IndexT s2Size,
-		ReusableBuffers& buffers)
-	{
-		if (s1Size == 0
-			|| s2Size == 0)
-		{
-			return 0.0f;
-		}
-
-		const char* shorter = s1Size <= s2Size ? s1 : s2;
-		const char* longer = s1Size <= s2Size ? s2 : s1;
-
-		const IndexT shorterSize = std::min(s1Size, s2Size);
-		const IndexT longerSize = std::max(s1Size, s2Size);
-
-		//const float maxDist = static_cast<float>(2 * shorterSize);
-		float maxRatio = 0.0f;
-		for (IndexT i = 0; i <= longerSize - shorterSize; i++)
-		{
-			const char* windowPos = &longer[i];
-			const IndexT windowSize = shorterSize;
-
-			//const int dist = LevenshteinDistance(shorter,
-			//	shorterSize,
-			//	windowPos,
-			//	windowSize,
-			//	buffers);
-
-			//const float ratio = static_cast<float>(dist) / maxDist;
-			const float ratio = Ratio(shorter,
-				shorterSize,
-				windowPos,
-				windowSize,
-				buffers);
-			maxRatio = std::max(maxRatio, ratio);
-
-			if (maxRatio >= 1.0f)
-			{
-				break;
-			}
-		}
-		return maxRatio;
-	}
-
 	std::string MakeTokenSortedString(const std::string& original)
 	{
 		const std::vector<std::string> targetTokens = TokeniseAndSort(original);
@@ -657,52 +545,34 @@ namespace
 		buffers.mScores.clear();
 		buffers.mScores.resize(input.mEntries.size());
 
-		const std::string& tokenSortedQuery = MakeTokenSortedString(input.mUserQuery);
-
-		const char* queryCStr = input.mUserQuery.c_str();
-		const IndexT querySize = static_cast<IndexT>(input.mUserQuery.size());
-
-		const char* tokenQueryCStr = tokenSortedQuery.c_str();
-		const IndexT tokenQuerySize = static_cast<IndexT>(tokenSortedQuery.size());
+		const ImSearch::StrView query = input.mUserQuery;
+		const std::string tokenSortedQuery = MakeTokenSortedString(input.mUserQuery);
 
 		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 		{
-			const std::string& entryStr = input.mEntries[i].mText;
+			const Searchable& entry = input.mEntries[i];
+			const ImSearch::StrView entryStr = entry.mText;
+			const ImSearch::StrView tokenSortedEntry = GetTokenSortedString(entry.mText);
 
-			const char* entryCStr = entryStr.c_str();
-			const IndexT entrySize = static_cast<IndexT>(entryStr.size());
+			float score = Ratio(query, entryStr, buffers);
 
-			const std::string& tokenSortedEntry = GetTokenSortedString(entryStr);
-			const char* tokenEntryCStr = tokenSortedEntry.c_str();
-			const IndexT tokenEntrySize = static_cast<IndexT>(tokenSortedEntry.size());
-
-			const char* shorter = querySize <= entrySize ? queryCStr : entryCStr;
-			const char* longer = querySize <= entrySize ? entryCStr : queryCStr;
-
-			const IndexT shorterSize = std::min(querySize, entrySize);
-			const IndexT longerSize = std::max(querySize, entrySize);
-
-			const char* shorterToken = tokenQuerySize <= tokenEntrySize ? tokenQueryCStr : tokenEntryCStr;
-			const char* longerToken = tokenQuerySize <= tokenEntrySize ? tokenEntryCStr : tokenQueryCStr;
-
-			const IndexT shorterTokenSize = std::min(tokenQuerySize, tokenEntrySize);
-			const IndexT longerTokenSize = std::max(tokenQuerySize, tokenEntrySize);
-
-			float score = Ratio(shorter, shorterSize, longer, longerSize, buffers);
+			const IndexT shorterSize = std::min(query.size(), entryStr.size());
+			const IndexT longerSize = std::max(query.size(), entryStr.size());
 
 			if (longerSize <= shorterSize + shorterSize / 2)
 			{
 				score = std::max(score,
-					Ratio(shorterToken, shorterTokenSize, longerToken, longerTokenSize, buffers) * 0.95f);
+					Ratio(tokenSortedQuery, tokenSortedEntry, buffers) * 0.95f);
 			}
 			else
 			{
 				const float weight = longerSize > shorterSize * 8 ? 0.5f : .8f;
 
-				score = std::max(score, PartialRatio(shorter, shorterSize, longer, longerSize, buffers) * weight);
+				score = std::max(score, 
+					PartialRatio(query, entryStr, buffers) * weight);
 
 				score = std::max(score,
-					PartialRatio(shorterToken, shorterTokenSize, longerToken, longerTokenSize, buffers) * 0.95f * weight);
+					PartialRatio(tokenSortedQuery, tokenSortedEntry, buffers) * 0.95f * weight);
 			}
 
 			if (i < static_cast<IndexT>(input.mBonuses.size()))
@@ -927,6 +797,88 @@ size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
 		return std::numeric_limits<size_t>::max();
 	}
 	return displayOrder[index];
+}
+
+int ImSearch::LevenshteinDistance(
+	StrView s1,
+	StrView s2,
+	ReusableBuffers& buffers)
+{
+	const IndexT matWidth = s1.size() + 1;
+	const IndexT matHeight = s2.size() + 1;
+
+	std::vector<IndexT>& dp = buffers.mTempIndices;
+	buffers.mTempIndices.resize(matWidth * matHeight);
+
+	for (IndexT x = 0; x < matWidth; x++)
+	{
+		dp[x] = x;
+
+	}
+	for (IndexT y = 0; y < matHeight; y++)
+	{
+		dp[y * matWidth] = y;
+	}
+
+	for (IndexT x = 1; x < matWidth; x++)
+	{
+		for (IndexT y = 1; y < matHeight; y++)
+		{
+			const char c1 = static_cast<char>(std::tolower(static_cast<unsigned char>(s1[x - 1])));
+			const char c2 = static_cast<char>(std::tolower(static_cast<unsigned char>(s2[y - 1])));
+			const IndexT cost = (c1 == c2) ? 0 : 1;
+
+			dp[x + y * matWidth] =
+				std::min(
+					std::min(dp[(x - 1) + y * matWidth] + 1, dp[x + (y - 1) * matWidth] + 1),
+					dp[(x - 1) + (y - 1) * matWidth] + cost
+				);
+		}
+	}
+
+	return static_cast<int>(dp.back());
+}
+
+float ImSearch::Ratio(StrView s1,
+	StrView s2,
+	ReusableBuffers& buffers)
+{
+	const int distance = LevenshteinDistance(s1,
+		s2,
+		buffers);
+	const float ratio = 1.0f - static_cast<float>(distance) / static_cast<float>(s1.size() + s2.size());
+	return ratio;
+}
+
+float ImSearch::PartialRatio(StrView shorter,
+	StrView longer,
+	ReusableBuffers& buffers)
+{
+	if (shorter.size() == 0
+		|| longer.size() == 0)
+	{
+		return 0.0f;
+	}
+
+	if (shorter.size() > longer.size())
+	{
+		std::swap(shorter, longer);
+	}
+
+	float maxRatio = 0.0f;
+	for (IndexT i = 0; i <= longer.size() - shorter.size(); i++)
+	{
+		const float ratio = Ratio(shorter,
+			{ &longer[i], shorter.size() }, // Window into longer
+			buffers);
+		maxRatio = std::max(maxRatio, ratio);
+
+		if (maxRatio >= 1.0f)
+		{
+			break;
+		}
+	}
+	return maxRatio;
 }
 
 #endif // #ifndef IMGUI_DISABLE
