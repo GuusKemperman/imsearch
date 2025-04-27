@@ -4,147 +4,26 @@
 #include "imsearch_internal.h"
 #include "imgui.h"
 
-#include <memory>
-#include <string>
-#include <stack>
-#include <algorithm>
-#include <unordered_map>
-#include <type_traits>
-#include <numeric>
-#include <limits>
-#include <cctype>
-
-using namespace ImSearch;
-
-namespace
-{
-
-	// Here is why we are using VTables instead of just std::function:
-	// std::function's SBO optimisation means it might consume
-	// more memory than needed if the user has not captured anything,
-	// and if the user is capturing more than fits in the SBO storage,
-	// performance tanks due to the many heap allocations. Now,
-	// the VTableFunctor is slower than using std::function, it makes
-	// the implementation and API slightly more complicated, BUT, if we
-	// were to release with std::function in the public API, I would not
-	// be able to get rid of std::function without breaking forward
-	// compatibility in the future. By keeping the concept of how functors
-	// are stored abstracted away in the backend, it can be optimised in
-	// the future without breaking API.
-	struct VTableFunctor
-	{
-		VTableFunctor() = default;
-
-		VTableFunctor(void* originalFunctor, ImSearch::Internal::VTable vTable);
-
-		VTableFunctor(const VTableFunctor&) = delete;
-		VTableFunctor(VTableFunctor&& other) noexcept;
-
-		VTableFunctor& operator=(const VTableFunctor&) = delete;
-		VTableFunctor& operator=(VTableFunctor&& other) noexcept;
-
-		~VTableFunctor();
-
-		operator bool() const { return mData != nullptr; }
-
-		// PushSearchable
-		bool operator()(const char* name) const;
-
-		// PopSearchable
-		void operator()() const;
-
-		void ClearData();
-
-		enum VTableModes
-		{
-			Invoke = 0,
-			MoveConstruct = 1,
-			Destruct = 2,
-			GetSize = 3
-		};
-
-		ImSearch::Internal::VTable mVTable{};
-		char* mData{};
-	};
-
-	struct Searchable
-	{
-		std::string mText{};
-
-		IndexT mIndexOfFirstChild = sNullIndex;
-		IndexT mIndexOfLastChild = sNullIndex;
-		IndexT mIndexOfParent = sNullIndex;
-		IndexT mIndexOfNextSibling = sNullIndex;
-	};
-
-	struct Input
-	{
-		std::vector<Searchable> mEntries{};
-		std::vector<float> mBonuses{};
-		std::string mUserQuery{};
-	};
-
-	struct Output
-	{
-		std::vector<IndexT> mDisplayOrder{};
-		static constexpr IndexT sDisplayEndFlag = static_cast<IndexT>(1) << static_cast<IndexT>(std::numeric_limits<IndexT>::digits - 1);
-	};
-
-	struct Result
-	{
-		Input mInput{};
-		ReusableBuffers mBuffers{};
-		Output mOutput{};
-	};
-
-	struct DisplayCallbacks
-	{
-		VTableFunctor mOnDisplayStart{};
-		VTableFunctor mOnDisplayEnd{};
-	};
-
-	struct LocalContext
-	{
-		Input mInput{};
-
-		std::vector<DisplayCallbacks> mDisplayCallbacks{};
-
-		std::stack<IndexT> mPushStack{};
-		Result mResult{};
-		bool mHasSubmitted{};
-	};
-}
-
 namespace ImSearch
 {
-	struct ImSearchContext
-	{
-		std::unordered_map<ImGuiID, LocalContext> Contexts{};
-		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
-		std::unordered_map<std::string, std::string> mTokenSortedStrings{};
-	};
+	static bool IsResultUpToDate(const ImSearch::Result& oldResult, const ImSearch::Input& currentInput);
+	static void BringResultUpToDate(ImSearch::Result& result);
+
+	static void AssignInitialScores(const Input& input, ReusableBuffers& buffers);
+	static void PropagateScoreToChildren(const Input& input, ReusableBuffers& buffers);
+	static void PropagateScoreToParents(const Input& input, ReusableBuffers& buffers);
+	
+	static void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output);
+	static void AppendToDisplayOrder(const Input& input, ReusableBuffers& buffers, IndexT startInIndicesBuffer, IndexT endInIndicesBuffer, Output& output);
+	
+	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
+
+	static ImSearch::ImSearchContext* sContext{};
 }
 
-namespace
-{
-	ImSearch::ImSearchContext* sContext{};
-
-	// Anything below this score is not displayed to the user.
-	constexpr float sCutOffStrength = .5f;
-
-	LocalContext& GetLocalContext();
-	ImSearch::ImSearchContext& GetImSearchContext();
-	IndexT GetCurrentItem(LocalContext& context);
-
-	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput);
-	void BringResultUpToDate(Result& result);
-	void DisplayToUser(const LocalContext& context, const Result& result);
-
-	bool CanCollectSubmissions();
-
-	bool operator==(const Searchable& lhs, const Searchable& rhs);
-	bool operator==(const Input& lhs, const Input& rhs);
-}
+//-----------------------------------------------------------------------------
+// [SECTION] Definitions from imsearch.h
+//-----------------------------------------------------------------------------
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
 {
@@ -277,11 +156,11 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 	if (functor != nullptr
 		&& vTable != nullptr)
 	{
-		context.mDisplayCallbacks.back().mOnDisplayStart = VTableFunctor{ functor, vTable };
+		context.mDisplayCallbacks.back().mOnDisplayStart = Callback{ functor, vTable };
 	}
 
 	const IndexT currentIndex = static_cast<IndexT>(context.mInput.mEntries.size() - static_cast<size_t>(1ull));
-	
+
 	if (!context.mPushStack.empty())
 	{
 		const IndexT parentIndex = context.mPushStack.top();
@@ -327,7 +206,7 @@ void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 	if (functor != nullptr
 		&& vTable != nullptr)
 	{
-		context.mDisplayCallbacks[indexOfCurrentCategory].mOnDisplayEnd = VTableFunctor{ functor, vTable };
+		context.mDisplayCallbacks[indexOfCurrentCategory].mOnDisplayEnd = Callback{ functor, vTable };
 	}
 
 	context.mPushStack.pop();
@@ -379,403 +258,325 @@ const char* ImSearch::GetUserQuery()
 	return context.mInput.mUserQuery.c_str();
 }
 
-namespace
+//-----------------------------------------------------------------------------
+// [SECTION] Definitions from static functions
+//-----------------------------------------------------------------------------
+
+bool ImSearch::IsResultUpToDate(const Result& oldResult, const Input& currentInput)
 {
-	VTableFunctor::VTableFunctor(void* originalFunctor, ImSearch::Internal::VTable vTable) :
-		mVTable(vTable)
+	return oldResult.mInput == currentInput;
+}
+
+void ImSearch::BringResultUpToDate(Result& result)
+{
+	AssignInitialScores(result.mInput, result.mBuffers);
+	PropagateScoreToChildren(result.mInput, result.mBuffers);
+	PropagateScoreToParents(result.mInput, result.mBuffers);
+	GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
+}
+
+void ImSearch::AssignInitialScores(const Input& input, ReusableBuffers& buffers)
+{
+	buffers.mScores.clear();
+	buffers.mScores.resize(input.mEntries.size());
+
+	const StrView query = input.mUserQuery;
+	const std::string tokenSortedQuery = MakeTokenisedString(input.mUserQuery);
+
+	for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 	{
-		if (mVTable == nullptr)
+		const Searchable& entry = input.mEntries[i];
+
+		float score = WeightedRatio(query,
+			tokenSortedQuery,
+			entry.mText,
+			GetMemoizedTokenisedString(entry.mText),
+			buffers);
+
+		if (i < static_cast<IndexT>(input.mBonuses.size()))
 		{
-			return;
+			score += input.mBonuses[i];
 		}
 
-		int size;
-		vTable(VTableModes::GetSize, &size, nullptr);
-		mData = static_cast<char*>(ImGui::MemAlloc(static_cast<size_t>(size)));
-		IM_ASSERT(mData != nullptr);
-		vTable(VTableModes::MoveConstruct, originalFunctor, mData);
-	}
-
-	VTableFunctor::VTableFunctor(VTableFunctor&& other) noexcept:
-		mVTable(other.mVTable),
-		mData(other.mData)
-	{
-		other.mVTable = nullptr;
-		other.mData = nullptr;
-	}
-
-	VTableFunctor& VTableFunctor::operator=(VTableFunctor&& other) noexcept
-	{
-		if (this == &other)
-		{
-			return *this;
-		}
-
-		ClearData();
-
-		mVTable = other.mVTable;
-		mData = other.mData;
-
-		other.mVTable = nullptr;
-		other.mData = nullptr;
-
-		return *this;
-	}
-
-	VTableFunctor::~VTableFunctor()
-	{
-		ClearData();
-	}
-
-	bool VTableFunctor::operator()(const char* name) const
-	{
-		return mVTable(VTableModes::Invoke, mData, const_cast<char*>(name));
-	}
-
-	void VTableFunctor::operator()() const
-	{
-		mVTable(VTableModes::Invoke, mData, nullptr);
-	}
-
-	void VTableFunctor::ClearData()
-	{
-		if (mData == nullptr)
-		{
-			return;
-		}
-
-		mVTable(VTableModes::Destruct, mData, nullptr);
-
-		ImGui::MemFree(mData);
-		mData = nullptr;
-	}
-
-	LocalContext& GetLocalContext()
-	{
-		ImSearch::ImSearchContext& ImSearchContext = GetImSearchContext();
-		IM_ASSERT(!ImSearchContext.ContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
-		return ImSearchContext.ContextStack.top();
-	}
-
-	ImSearch::ImSearchContext& GetImSearchContext()
-	{
-		ImSearch::ImSearchContext* context = ImSearch::GetCurrentContext();
-		IM_ASSERT(sContext != nullptr && "An ImSearchContext has not been created, see ImSearch::CreateContext");
-		return *context;
-	}
-
-	IndexT GetCurrentItem(LocalContext& context)
-	{
-		IM_ASSERT(!context.mPushStack.empty() && "No active object; can only be called after PushSearchable");
-		IM_ASSERT(!context.mHasSubmitted && "No active object; Submit (or EndSearch) has already been called");
-		return context.mPushStack.top();
-	}
-
-	bool IsResultUpToDate(const Result& oldResult, const Input& currentInput)
-	{
-		return oldResult.mInput == currentInput;
-	}
-
-	std::vector<std::string> TokeniseAndSort(const std::string& s)
-	{
-		std::vector<std::string> tokens{};
-		std::string current{};
-		for (char c : s)
-		{
-			if (std::isalnum(static_cast<unsigned char>(c)))
-			{
-				current += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-				continue;
-			}
-
-			if (!current.empty())
-			{
-				tokens.push_back(current);
-				current.clear();
-			}
-		}
-
-		if (!current.empty())
-		{
-			tokens.push_back(current);
-		}
-		std::sort(tokens.begin(), tokens.end());
-		return tokens;
-	}
-
-	std::string Join(const std::vector<std::string>& tokens)
-	{
-		if (tokens.empty())
-		{
-			return {};
-		}
-
-		std::string res = tokens[0];
-		for (size_t i = 1; i < tokens.size(); i++)
-		{
-			res += ' ' + tokens[i];
-		}
-		return res;
-	}
-
-	std::string MakeTokenSortedString(const std::string& original)
-	{
-		const std::vector<std::string> targetTokens = TokeniseAndSort(original);
-		std::string processedTarget = Join(targetTokens);
-		return processedTarget;
-	}
-
-	const std::string& GetTokenSortedString(const std::string& original)
-	{
-		ImSearch::ImSearchContext& context = GetImSearchContext();
-		auto& preprocessedStrings = context.mTokenSortedStrings;
-
-		auto it = context.mTokenSortedStrings.find(original);
-
-		if (it == preprocessedStrings.end())
-		{
-			it = preprocessedStrings.emplace(original, MakeTokenSortedString(original)).first;
-		}
-
-		return it->second;
-	}
-
-	void AssignInitialScores(const Input& input, ReusableBuffers& buffers)
-	{
-		buffers.mScores.clear();
-		buffers.mScores.resize(input.mEntries.size());
-
-		const ImSearch::StrView query = input.mUserQuery;
-		const std::string tokenSortedQuery = MakeTokenSortedString(input.mUserQuery);
-
-		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
-		{
-			const Searchable& entry = input.mEntries[i];
-			const ImSearch::StrView entryStr = entry.mText;
-			const ImSearch::StrView tokenSortedEntry = GetTokenSortedString(entry.mText);
-
-			float score = Ratio(query, entryStr, buffers);
-
-			const IndexT shorterSize = std::min(query.size(), entryStr.size());
-			const IndexT longerSize = std::max(query.size(), entryStr.size());
-
-			if (longerSize <= shorterSize + shorterSize / 2)
-			{
-				score = std::max(score,
-					Ratio(tokenSortedQuery, tokenSortedEntry, buffers) * 0.95f);
-			}
-			else
-			{
-				const float weight = longerSize > shorterSize * 8 ? 0.5f : .8f;
-
-				score = std::max(score, 
-					PartialRatio(query, entryStr, buffers) * weight);
-
-				score = std::max(score,
-					PartialRatio(tokenSortedQuery, tokenSortedEntry, buffers) * 0.95f * weight);
-			}
-
-			if (i < static_cast<IndexT>(input.mBonuses.size()))
-			{
-				score += input.mBonuses[i];
-			}
-
-			buffers.mScores[i] = score;
-		}
-	}
-
-	void PropagateScoreToChildren(const Input& input, ReusableBuffers& buffers)
-	{
-		// Each node can only be the child of ONE parent.
-		// Children can only be submitted AFTER their parent.
-		// When iterating over the nodes, we will always
-		// encounter a parent before a child.
-		for (IndexT parentIndex = 0; parentIndex < static_cast<IndexT>(input.mEntries.size()); parentIndex++)
-		{
-			const Searchable& parent = input.mEntries[parentIndex];
-			const float parentScore = buffers.mScores[parentIndex];
-
-			for (IndexT childIndex = parent.mIndexOfFirstChild;
-				childIndex != sNullIndex;
-				childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
-			{
-				float& childScore = buffers.mScores[childIndex];
-				childScore = std::max(childScore, parentScore);
-			}
-		}
-	}
-
-	void PropagateScoreToParents(const Input& input, ReusableBuffers& buffers)
-	{
-		// Children can only be submitted AFTER their parent.
-		// When iterating over the entries in reverse, we will
-		// always reach a node's child before the node itself.
-		for (IndexT childIndex = static_cast<IndexT>(input.mEntries.size()); childIndex --> 0;)
-		{
-			const IndexT parentIndex = input.mEntries[childIndex].mIndexOfParent;
-
-			if (parentIndex == sNullIndex)
-			{
-				continue;
-			}
-
-			const float childScore = buffers.mScores[childIndex];
-			float& parentScore = buffers.mScores[parentIndex];
-			parentScore = std::max(parentScore, childScore);
-		}
-	}
-
-	void AppendToDisplayOrder(const Input& input, 
-		ReusableBuffers& buffers, 
-		IndexT startInIndicesBuffer,
-		IndexT endInIndicesBuffer,
-		Output& output)
-	{
-		std::stable_sort(buffers.mTempIndices.begin() + startInIndicesBuffer,
-			buffers.mTempIndices.begin() + endInIndicesBuffer,
-			[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
-			{
-				const float lhsScore = buffers.mScores[lhsIndex];
-				const float rhsScore = buffers.mScores[rhsIndex];
-
-				return lhsScore > rhsScore;
-			});
-
-		for (IndexT indexInIndicesBuffer = startInIndicesBuffer; indexInIndicesBuffer < endInIndicesBuffer; indexInIndicesBuffer++)
-		{
-			IndexT searchableIndex = buffers.mTempIndices[indexInIndicesBuffer];
-
-			const IndexT nextStartInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
-
-			output.mDisplayOrder.emplace_back(searchableIndex);
-
-			const Searchable& searchable = input.mEntries[searchableIndex];
-			for (IndexT childIndex = searchable.mIndexOfFirstChild;
-				childIndex != sNullIndex;
-				childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
-			{
-				if (buffers.mScores[childIndex] >= sCutOffStrength)
-				{
-					buffers.mTempIndices.emplace_back(childIndex);
-				}
-			}
-
-			const IndexT nextEndInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
-
-			AppendToDisplayOrder(input, 
-				buffers, 
-				nextStartInIndicesBuffer,
-				nextEndInIndicesBuffer, 
-				output);
-
-			output.mDisplayOrder.emplace_back(searchableIndex | Output::sDisplayEndFlag);
-		}
-	}
-
-	void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
-	{
-		output.mDisplayOrder.clear();
-		buffers.mTempIndices.clear();
-
-		for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
-		{
-			if (input.mEntries[i].mIndexOfParent == sNullIndex
-				&& buffers.mScores[i] >= sCutOffStrength)
-			{
-				buffers.mTempIndices.emplace_back(i);
-			}
-		}
-
-		AppendToDisplayOrder(input, 
-			buffers,
-			0,
-			static_cast<IndexT>(buffers.mTempIndices.size()),
-			output);
-	}
-
-	void BringResultUpToDate(Result& result)
-	{
-		AssignInitialScores(result.mInput, result.mBuffers);
-		PropagateScoreToChildren(result.mInput, result.mBuffers);
-		PropagateScoreToParents(result.mInput, result.mBuffers);
-		GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
-	}
-
-	void DisplayToUser(const LocalContext& context, const Result& result)
-	{
-		const bool isUserSearching = !result.mInput.mUserQuery.empty();
-		ImGui::PushID(isUserSearching);
-
-		const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
-
-		for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
-		{
-			const IndexT indexAndFlag = *it;
-			const IndexT index = indexAndFlag & ~Output::sDisplayEndFlag;
-			const IndexT isEnd = indexAndFlag & Output::sDisplayEndFlag;
-
-			const Searchable& searchable = result.mInput.mEntries[index];
-			const DisplayCallbacks& callbacks = context.mDisplayCallbacks[index];
-
-			if (isEnd)
-			{
-				if (callbacks.mOnDisplayEnd)
-				{
-					callbacks.mOnDisplayEnd();
-				}
-				continue;
-			}
-
-			if (!callbacks.mOnDisplayStart)
-			{
-				continue;
-			}
-
-			if (isUserSearching)
-			{
-				ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-			}
-
-			if (callbacks.mOnDisplayStart(searchable.mText.c_str()))
-			{
-				continue;
-			}
-
-			// The user start function was called, but returned false.
-			// We need to avoid displaying this searchable's children,
-			// and make sure we call the corresponding mOnDisplayEnd
-			it = std::find(it + 1, displayOrder.end(), index | Output::sDisplayEndFlag);
-			IM_ASSERT(it != displayOrder.end());
-		}
-
-		ImGui::PopID();
-	}
-
-	bool CanCollectSubmissions()
-	{
-		// ImSearch does not store anything the programmer is submitting if the user
-		// is not actively searching, for performance and memory reasons.
-		return *ImSearch::GetUserQuery() != '\0';
-	}
-
-	bool operator==(const Searchable& lhs, const Searchable& rhs)
-	{
-		return lhs.mText == rhs.mText
-			&& lhs.mIndexOfFirstChild == rhs.mIndexOfFirstChild
-			&& lhs.mIndexOfLastChild == rhs.mIndexOfLastChild
-			&& lhs.mIndexOfParent == rhs.mIndexOfParent
-			&& lhs.mIndexOfNextSibling == rhs.mIndexOfNextSibling;
-	}
-
-	bool operator==(const Input& lhs, const Input& rhs)
-	{
-		return lhs.mUserQuery == rhs.mUserQuery
-			&& lhs.mEntries == rhs.mEntries
-			&& lhs.mBonuses == rhs.mBonuses;
+		buffers.mScores[i] = score;
 	}
 }
 
-float ImSearch::Internal::GetScore(size_t index)
+void ImSearch::PropagateScoreToChildren(const Input& input, ReusableBuffers& buffers)
+{
+	// Each node can only be the child of ONE parent.
+	// Children can only be submitted AFTER their parent.
+	// When iterating over the nodes, we will always
+	// encounter a parent before a child.
+	for (IndexT parentIndex = 0; parentIndex < static_cast<IndexT>(input.mEntries.size()); parentIndex++)
+	{
+		const Searchable& parent = input.mEntries[parentIndex];
+		const float parentScore = buffers.mScores[parentIndex];
+
+		for (IndexT childIndex = parent.mIndexOfFirstChild;
+			childIndex != sNullIndex;
+			childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
+		{
+			float& childScore = buffers.mScores[childIndex];
+			childScore = std::max(childScore, parentScore);
+		}
+	}
+}
+
+void ImSearch::PropagateScoreToParents(const Input& input, ReusableBuffers& buffers)
+{
+	// Children can only be submitted AFTER their parent.
+	// When iterating over the entries in reverse, we will
+	// always reach a node's child before the node itself.
+	for (IndexT childIndex = static_cast<IndexT>(input.mEntries.size()); childIndex-- > 0;)
+	{
+		const IndexT parentIndex = input.mEntries[childIndex].mIndexOfParent;
+
+		if (parentIndex == sNullIndex)
+		{
+			continue;
+		}
+
+		const float childScore = buffers.mScores[childIndex];
+		float& parentScore = buffers.mScores[parentIndex];
+		parentScore = std::max(parentScore, childScore);
+	}
+}
+
+void ImSearch::GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output)
+{
+	output.mDisplayOrder.clear();
+	buffers.mTempIndices.clear();
+
+	for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
+	{
+		if (input.mEntries[i].mIndexOfParent == sNullIndex
+			&& buffers.mScores[i] >= sCutOffStrength)
+		{
+			buffers.mTempIndices.emplace_back(i);
+		}
+	}
+
+	AppendToDisplayOrder(input,
+		buffers,
+		0,
+		static_cast<IndexT>(buffers.mTempIndices.size()),
+		output);
+}
+
+void ImSearch::AppendToDisplayOrder(const Input& input,
+	ReusableBuffers& buffers,
+	IndexT startInIndicesBuffer,
+	IndexT endInIndicesBuffer,
+	Output& output)
+{
+	std::stable_sort(buffers.mTempIndices.begin() + startInIndicesBuffer,
+		buffers.mTempIndices.begin() + endInIndicesBuffer,
+		[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
+		{
+			const float lhsScore = buffers.mScores[lhsIndex];
+			const float rhsScore = buffers.mScores[rhsIndex];
+
+			return lhsScore > rhsScore;
+		});
+
+	for (IndexT indexInIndicesBuffer = startInIndicesBuffer; indexInIndicesBuffer < endInIndicesBuffer; indexInIndicesBuffer++)
+	{
+		IndexT searchableIndex = buffers.mTempIndices[indexInIndicesBuffer];
+
+		const IndexT nextStartInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
+
+		output.mDisplayOrder.emplace_back(searchableIndex);
+
+		const Searchable& searchable = input.mEntries[searchableIndex];
+		for (IndexT childIndex = searchable.mIndexOfFirstChild;
+			childIndex != sNullIndex;
+			childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
+		{
+			if (buffers.mScores[childIndex] >= sCutOffStrength)
+			{
+				buffers.mTempIndices.emplace_back(childIndex);
+			}
+		}
+
+		const IndexT nextEndInIndicesBuffer = static_cast<IndexT>(buffers.mTempIndices.size());
+
+		AppendToDisplayOrder(input,
+			buffers,
+			nextStartInIndicesBuffer,
+			nextEndInIndicesBuffer,
+			output);
+
+		output.mDisplayOrder.emplace_back(searchableIndex | Output::sDisplayEndFlag);
+	}
+}
+
+void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
+{
+	const bool isUserSearching = !result.mInput.mUserQuery.empty();
+	ImGui::PushID(isUserSearching);
+
+	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
+
+	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
+	{
+		const IndexT indexAndFlag = *it;
+		const IndexT index = indexAndFlag & ~Output::sDisplayEndFlag;
+		const IndexT isEnd = indexAndFlag & Output::sDisplayEndFlag;
+
+		const Searchable& searchable = result.mInput.mEntries[index];
+		const DisplayCallbacks& callbacks = context.mDisplayCallbacks[index];
+
+		if (isEnd)
+		{
+			if (callbacks.mOnDisplayEnd)
+			{
+				callbacks.mOnDisplayEnd();
+			}
+			continue;
+		}
+
+		if (!callbacks.mOnDisplayStart)
+		{
+			continue;
+		}
+
+		if (isUserSearching)
+		{
+			ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+		}
+
+		if (callbacks.mOnDisplayStart(searchable.mText.c_str()))
+		{
+			continue;
+		}
+
+		// The user start function was called, but returned false.
+		// We need to avoid displaying this searchable's children,
+		// and make sure we call the corresponding mOnDisplayEnd
+		it = std::find(it + 1, displayOrder.end(), index | Output::sDisplayEndFlag);
+		IM_ASSERT(it != displayOrder.end());
+	}
+
+	ImGui::PopID();
+}
+
+//-----------------------------------------------------------------------------
+// [SECTION] Definitions from imsearch_internal.h
+//-----------------------------------------------------------------------------
+
+ImSearch::Callback::Callback(void* originalFunctor, ImSearch::Internal::VTable vTable) :
+	mVTable(vTable)
+{
+	if (mVTable == nullptr)
+	{
+		return;
+	}
+
+	int size;
+	vTable(VTableModes::GetSize, &size, nullptr);
+	mData = static_cast<char*>(ImGui::MemAlloc(static_cast<size_t>(size)));
+	IM_ASSERT(mData != nullptr);
+	vTable(VTableModes::MoveConstruct, originalFunctor, mData);
+}
+
+ImSearch::Callback::Callback(Callback&& other) noexcept :
+	mVTable(other.mVTable),
+	mData(other.mData)
+{
+	other.mVTable = nullptr;
+	other.mData = nullptr;
+}
+
+ImSearch::Callback& ImSearch::Callback::operator=(Callback&& other) noexcept
+{
+	if (this == &other)
+	{
+		return *this;
+	}
+
+	ClearData();
+
+	mVTable = other.mVTable;
+	mData = other.mData;
+
+	other.mVTable = nullptr;
+	other.mData = nullptr;
+
+	return *this;
+}
+
+ImSearch::Callback::~Callback()
+{
+	ClearData();
+}
+
+bool ImSearch::Callback::operator()(const char* name) const
+{
+	return mVTable(VTableModes::Invoke, mData, const_cast<char*>(name));
+}
+
+void ImSearch::Callback::operator()() const
+{
+	mVTable(VTableModes::Invoke, mData, nullptr);
+}
+
+void ImSearch::Callback::ClearData()
+{
+	if (mData == nullptr)
+	{
+		return;
+	}
+
+	mVTable(VTableModes::Destruct, mData, nullptr);
+
+	ImGui::MemFree(mData);
+	mData = nullptr;
+}
+
+bool ImSearch::operator==(const Searchable& lhs, const Searchable& rhs)
+{
+	return lhs.mText == rhs.mText
+		&& lhs.mIndexOfFirstChild == rhs.mIndexOfFirstChild
+		&& lhs.mIndexOfLastChild == rhs.mIndexOfLastChild
+		&& lhs.mIndexOfParent == rhs.mIndexOfParent
+		&& lhs.mIndexOfNextSibling == rhs.mIndexOfNextSibling;
+}
+
+bool ImSearch::operator==(const Input& lhs, const Input& rhs)
+{
+	return lhs.mUserQuery == rhs.mUserQuery
+		&& lhs.mEntries == rhs.mEntries
+		&& lhs.mBonuses == rhs.mBonuses;
+}
+
+ImSearch::LocalContext& ImSearch::GetLocalContext()
+{
+	ImSearch::ImSearchContext& ImSearchContext = GetImSearchContext();
+	IM_ASSERT(!ImSearchContext.ContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
+	return ImSearchContext.ContextStack.top();
+}
+
+ImSearch::ImSearchContext& ImSearch::GetImSearchContext()
+{
+	ImSearch::ImSearchContext* context = ImSearch::GetCurrentContext();
+	IM_ASSERT(sContext != nullptr && "An ImSearchContext has not been created, see ImSearch::CreateContext");
+	return *context;
+}
+
+ImSearch::IndexT ImSearch::GetCurrentItem(ImSearch::LocalContext& context)
+{
+	IM_ASSERT(!context.mPushStack.empty() && "No active object; can only be called after PushSearchable");
+	IM_ASSERT(!context.mHasSubmitted && "No active object; Submit (or EndSearch) has already been called");
+	return context.mPushStack.top();
+}
+
+bool ImSearch::CanCollectSubmissions()
+{
+	return *ImSearch::GetUserQuery() != '\0';
+}
+
+float ImSearch::GetScore(size_t index)
 {
 	LocalContext& context = GetLocalContext();
 	auto& scores = context.mResult.mBuffers.mScores;
@@ -787,7 +588,7 @@ float ImSearch::Internal::GetScore(size_t index)
 	return scores[index];
 }
 
-size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
+size_t ImSearch::GetDisplayOrderEntry(size_t index)
 {
 	LocalContext& context = GetLocalContext();
 	auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
@@ -797,6 +598,70 @@ size_t ImSearch::Internal::GetDisplayOrderEntry(size_t index)
 		return std::numeric_limits<size_t>::max();
 	}
 	return displayOrder[index];
+}
+
+std::vector<std::string> ImSearch::SplitTokens(StrView s)
+{
+	std::vector<std::string> tokens{};
+	std::string current{};
+	for (char c : s)
+	{
+		if (std::isalnum(static_cast<unsigned char>(c)))
+		{
+			current += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+			continue;
+		}
+
+		if (!current.empty())
+		{
+			tokens.push_back(current);
+			current.clear();
+		}
+	}
+
+	if (!current.empty())
+	{
+		tokens.push_back(current);
+	}
+	return tokens;
+}
+
+std::string ImSearch::Join(const std::vector<std::string>& tokens)
+{
+	if (tokens.empty())
+	{
+		return {};
+	}
+
+	std::string res = tokens[0];
+	for (size_t i = 1; i < tokens.size(); i++)
+	{
+		res += ' ' + tokens[i];
+	}
+	return res;
+}
+
+std::string ImSearch::MakeTokenisedString(StrView original)
+{
+	std::vector<std::string> targetTokens = SplitTokens(original);
+	std::sort(targetTokens.begin(), targetTokens.end());
+	const std::string processedTarget = Join(targetTokens);
+	return processedTarget;
+}
+
+ImSearch::StrView ImSearch::GetMemoizedTokenisedString(const std::string& original)
+{
+	ImSearch::ImSearchContext& context = GetImSearchContext();
+	auto& preprocessedStrings = context.mTokenisedStrings;
+
+	auto it = context.mTokenisedStrings.find(original);
+
+	if (it == preprocessedStrings.end())
+	{
+		it = preprocessedStrings.emplace(original, MakeTokenisedString(original)).first;
+	}
+
+	return it->second;
 }
 
 int ImSearch::LevenshteinDistance(
@@ -879,6 +744,36 @@ float ImSearch::PartialRatio(StrView shorter,
 		}
 	}
 	return maxRatio;
+}
+
+float ImSearch::WeightedRatio(StrView s1,
+	StrView s1Tokenised,
+	StrView s2,
+	StrView s2Tokenised,
+	ReusableBuffers& buffers)
+{
+	float score = Ratio(s1, s2, buffers);
+
+	const IndexT shorterSize = std::min(s1.size(), s2.size());
+	const IndexT longerSize = std::max(s1.size(), s2.size());
+
+	if (longerSize <= shorterSize + shorterSize / 2)
+	{
+		score = std::max(score,
+			Ratio(s1Tokenised, s2Tokenised, buffers) * 0.95f);
+	}
+	else
+	{
+		const float weight = longerSize > shorterSize * 8 ? 0.5f : .8f;
+
+		score = std::max(score,
+			PartialRatio(s1, s2, buffers) * weight);
+
+		score = std::max(score,
+			PartialRatio(s1Tokenised, s2Tokenised, buffers) * 0.95f * weight);
+	}
+
+	return score;
 }
 
 #endif // #ifndef IMGUI_DISABLE
