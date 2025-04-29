@@ -201,7 +201,7 @@ namespace ImSearch
 
 	StrView GetMemoizedTokenisedString(const std::string& original);
 
-	int LevenshteinDistance(
+	IndexT LevenshteinDistance(
 		StrView s1,
 		StrView s2,
 		ReusableBuffers& buffers);
