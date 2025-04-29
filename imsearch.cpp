@@ -585,6 +585,7 @@ float ImSearch::GetScore(size_t index)
 	{
 		return -1.0f;
 	}
+
 	return scores[index];
 }
 
@@ -664,51 +665,111 @@ ImSearch::StrView ImSearch::GetMemoizedTokenisedString(const std::string& origin
 	return it->second;
 }
 
-int ImSearch::LevenshteinDistance(
+// This file has been altered to better fit ImSearch.
+// The original can be found here https://github.com/Tmplt/python-Levenshtein/blob/master/Levenshtein.c
+ImSearch::IndexT ImSearch::LevenshteinDistance(
 	StrView s1,
 	StrView s2,
 	ReusableBuffers& buffers)
 {
-	const IndexT matWidth = s1.size() + 1;
-	const IndexT matHeight = s2.size() + 1;
+	IndexT i;
+	IndexT* row;  /* we only need to keep one row of costs */
+	IndexT* end;
 
-	std::vector<IndexT>& dp = buffers.mTempIndices;
-	buffers.mTempIndices.resize(matWidth * matHeight);
-
-	for (IndexT x = 0; x < matWidth; x++)
+	/* strip common prefix */
+	while (s1.mSize > 0 
+		&& s2.mSize > 0 
+		&& *s1.mData == *s2.mData) 
 	{
-		dp[x] = x;
-
+		s1.mSize--;
+		s2.mSize--;
+		s1.mData++;
+		s2.mData++;
 	}
-	for (IndexT y = 0; y < matHeight; y++)
+
+	/* strip common suffix */
+	while (s1.mSize > 0 && s2.mSize > 0 && s1.mData[s1.mSize - 1] == s2.mData[s2.mSize - 1]) 
 	{
-		dp[y * matWidth] = y;
+		s1.mSize--;
+		s2.mSize--;
 	}
 
-	for (IndexT x = 1; x < matWidth; x++)
+	/* catch trivial cases */
+	if (s1.mSize == 0)
 	{
-		for (IndexT y = 1; y < matHeight; y++)
+		return s2.mSize;
+	}
+	if (s2.mSize == 0)
+	{
+		return s1.mSize;
+	}
+
+	/* make the inner cycle (i.e. s2.mData) the longer one */
+	if (s1.mSize > s2.mSize) 
+	{
+		IndexT nx = s1.mSize;
+		const char* sx = s1.mData;
+		s1.mSize = s2.mSize;
+		s2.mSize = nx;
+		s1.mData = s2.mData;
+		s2.mData = sx;
+	}
+	/* check s1.mSize == 1 separately */
+	if (s1.mSize == 1) 
+	{
+		return s2.mSize + 1 - 2 * (memchr(s2.mData, *s1.mData, s2.mSize) != nullptr);
+	}
+	s1.mSize++;
+	s2.mSize++;
+
+	/* initialize first row */
+	buffers.mTempIndices.resize(s2.mSize);
+	row = buffers.mTempIndices.data();
+	end = row + s2.mSize - 1;
+	for (i = 0; i < s2.mSize; i++)
+	{
+		row[i] = i;
+	}
+
+	/* go through the matrix and compute the costs.  yes, this is an extremely
+	 * obfuscated version, but also extremely memory-conservative and relatively
+	 * fast.  */
+	for (i = 1; i < s1.mSize; i++)
+	{
+		IndexT* p = row + 1;
+		const char char1 = s1.mData[i - 1];
+		const char* char2p = s2.mData;
+		IndexT D = i;
+		IndexT x = i;
+		while (p <= end) 
 		{
-			const char c1 = static_cast<char>(std::tolower(static_cast<unsigned char>(s1[x - 1])));
-			const char c2 = static_cast<char>(std::tolower(static_cast<unsigned char>(s2[y - 1])));
-			const IndexT cost = (c1 == c2) ? 0 : 1;
-
-			dp[x + y * matWidth] =
-				std::min(
-					std::min(dp[(x - 1) + y * matWidth] + 1, dp[x + (y - 1) * matWidth] + 1),
-					dp[(x - 1) + (y - 1) * matWidth] + cost
-				);
+			if (char1 == *(char2p++))
+			{
+				x = --D;
+			}
+			else
+			{
+				x++;
+			}
+			D = *p;
+			D++;
+			if (x > D)
+			{
+				x = D;
+			}
+			*(p++) = x;
 		}
 	}
-
-	return static_cast<int>(dp.back());
+	
+	i = *end;
+	return i;
 }
 
 float ImSearch::Ratio(StrView s1,
 	StrView s2,
 	ReusableBuffers& buffers)
 {
-	const int distance = LevenshteinDistance(s1,
+	const IndexT distance = LevenshteinDistance(s1,
 		s2,
 		buffers);
 	const float ratio = 1.0f - static_cast<float>(distance) / static_cast<float>(s1.size() + s2.size());
