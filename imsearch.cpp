@@ -3,6 +3,7 @@
 #include "imsearch.h"
 #include "imsearch_internal.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 namespace ImSearch
 {
@@ -100,6 +101,36 @@ void ImSearch::SearchBar(const char* hint)
 			return 0;
 		},
 		&userQuery);
+
+	// Some logic for drawing the search icon
+	const ImVec2 hintSize = ImGui::CalcTextSize(hint);
+	ImRect availRect{ ImGui::GetItemRectMin(), ImGui::GetItemRectMax() };
+	availRect.Min.x += hintSize.x + ImGui::GetStyle().FramePadding.x * 2.0f;
+	availRect.Max.x = std::max(availRect.Min.x, availRect.Max.x);
+
+	const float barHalfHeight = availRect.GetHeight() * .5f;
+	const ImVec2 iconCentre = { availRect.Max.x - barHalfHeight, (availRect.Min.y + availRect.Max.y) * 0.5f };
+
+	const float lensRadius = barHalfHeight * .5f;
+	const ImVec2 lensCentre = { iconCentre.x - barHalfHeight * .2f,  iconCentre.y - barHalfHeight * .2f };
+
+	const float handleLength = barHalfHeight * .4f;
+	static constexpr float halfSqrt2 = 0.707106781187f;
+
+	const ImVec2 handleTopLeft = { lensCentre.x + lensRadius * halfSqrt2, lensCentre.y + lensRadius * halfSqrt2 };
+	const ImVec2 handleBottomRight = { handleTopLeft.x + handleLength, handleTopLeft.y + handleLength };
+
+	const ImVec2 iconTopLeft{ lensCentre.x - lensRadius, lensCentre.y - lensRadius };
+	const ImRect iconRect{ iconTopLeft, handleBottomRight };
+
+	if (availRect.Contains(iconRect))
+	{
+		const ImU32 col = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		drawList->AddCircle(lensCentre, lensRadius, col);
+		drawList->AddLine(handleTopLeft, handleBottomRight, col);
+	}
 
 	if (ImGui::IsWindowAppearing())
 	{
