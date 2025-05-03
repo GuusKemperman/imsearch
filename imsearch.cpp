@@ -104,7 +104,7 @@ void ImSearch::SearchBar(const char* hint)
 			}
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
 			{
-				const std::string& toAppend = capturedContext->mResult.mOutput.mStringToAppendOnAutoComplete;
+				const std::string& toAppend = capturedContext->mResult.mOutput.mToAppendOnAutoComplete;
 				data->InsertChars(static_cast<int>(capturedStr.size()), toAppend.c_str(), toAppend.c_str() + toAppend.size());
 			}
 			return 0;
@@ -156,7 +156,7 @@ void ImSearch::SearchBar(const char* hint)
 		completePreviewPos.x += ImGui::GetStyle().FramePadding.x;
 		completePreviewPos.y += ImGui::GetStyle().FramePadding.y;
 
-		drawList->AddText(completePreviewPos, disabledTextCol, context.mResult.mOutput.mStringToAppendOnAutoComplete.c_str());
+		drawList->AddText(completePreviewPos, disabledTextCol, context.mResult.mOutput.mToAppendOnAutoComplete.c_str());
 	}
 }
 
@@ -467,7 +467,7 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 
 void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& output)
 {
-	output.mStringToAppendOnAutoComplete.clear();
+	output.mToAppendOnAutoComplete.clear();
 
 	const std::vector<std::string> tokensInQuery = SplitTokens(input.mUserQuery);
 
@@ -508,7 +508,7 @@ void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& outp
 				continue;
 			}
 
-			output.mStringToAppendOnAutoComplete = { token.data() + tokenToComplete.size(), token.size() - tokenToComplete.size() };
+			output.mToAppendOnAutoComplete = { token.data() + tokenToComplete.size(), token.size() - tokenToComplete.size() };
 			return;
 		}
 	}

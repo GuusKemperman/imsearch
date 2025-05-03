@@ -132,7 +132,7 @@ namespace ImSearch
 		std::vector<IndexT> mDisplayOrder{};
 		static constexpr IndexT sDisplayEndFlag = static_cast<IndexT>(1) << static_cast<IndexT>(std::numeric_limits<IndexT>::digits - 1);
 	
-		std::string mStringToAppendOnAutoComplete{};
+		std::string mToAppendOnAutoComplete{};
 	};
 
 	struct Result
