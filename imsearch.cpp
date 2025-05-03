@@ -129,13 +129,25 @@ void ImSearch::SearchBar(const char* hint)
 	const ImVec2 iconTopLeft{ lensCentre.x - lensRadius, lensCentre.y - lensRadius };
 	const ImRect iconRect{ iconTopLeft, handleBottomRight };
 
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	const ImU32 disabledTextCol = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
 	if (availRect.Contains(iconRect))
 	{
-		const ImU32 col = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+		drawList->AddCircle(lensCentre, lensRadius, disabledTextCol);
+		drawList->AddLine(handleTopLeft, handleBottomRight, disabledTextCol);
+	}
 
-		ImDrawList* drawList = ImGui::GetWindowDrawList();
-		drawList->AddCircle(lensCentre, lensRadius, col);
-		drawList->AddLine(handleTopLeft, handleBottomRight, col);
+	if (!userQuery.empty()
+		&& ImGui::IsItemFocused())
+	{
+		ImVec2 completePreviewPos = ImGui::GetItemRectMin();
+		completePreviewPos.x += ImGui::CalcTextSize(userQuery.c_str(), userQuery.c_str() + userQuery.size()).x;
+
+		completePreviewPos.x += ImGui::GetStyle().FramePadding.x;
+		completePreviewPos.y += ImGui::GetStyle().FramePadding.y;
+
+		drawList->AddText(completePreviewPos, disabledTextCol, "ello World");
 	}
 }
 
