@@ -131,6 +131,8 @@ namespace ImSearch
 	{
 		std::vector<IndexT> mDisplayOrder{};
 		static constexpr IndexT sDisplayEndFlag = static_cast<IndexT>(1) << static_cast<IndexT>(std::numeric_limits<IndexT>::digits - 1);
+	
+		std::string mToAppendOnAutoComplete{};
 	};
 
 	struct Result
@@ -164,6 +166,7 @@ namespace ImSearch
 		std::unordered_map<std::string, std::string> mTokenisedStrings{};
 	};
 
+	bool operator==(const StrView& lhs, const StrView& rhs);
 	bool operator==(const Searchable& lhs, const Searchable& rhs);
 	bool operator==(const Input& lhs, const Input& rhs);
 

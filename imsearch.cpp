@@ -17,6 +17,8 @@ namespace ImSearch
 	static void GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers, Output& output);
 	static void AppendToDisplayOrder(const Input& input, ReusableBuffers& buffers, IndexT startInIndicesBuffer, IndexT endInIndicesBuffer, Output& output);
 	
+	static void FindStringToAppendOnAutoComplete(const Input& input, Output& output);
+
 	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
 
 	static ImSearch::ImSearchContext* sContext{};
@@ -86,21 +88,28 @@ void ImSearch::SearchBar(const char* hint)
 		hint,
 		const_cast<char*>(userQuery.c_str()),
 		userQuery.capacity() + 1,
-		ImGuiInputTextFlags_CallbackResize,
+		ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion,
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
-			std::string* str = static_cast<std::string*>(data->UserData);
+			LocalContext* capturedContext = static_cast<LocalContext*>(data->UserData);
+			std::string& capturedStr = capturedContext->mInput.mUserQuery;
+
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 			{
 				// Resize string callback
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-				IM_ASSERT(data->Buf == str->c_str());
-				str->resize(static_cast<size_t>(data->BufTextLen));
-				data->Buf = const_cast<char*>(str->c_str());
+				IM_ASSERT(data->Buf == capturedStr.c_str());
+				capturedStr.resize(static_cast<size_t>(data->BufTextLen));
+				data->Buf = const_cast<char*>(capturedStr.c_str());
+			}
+			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+			{
+				const std::string& toAppend = capturedContext->mResult.mOutput.mToAppendOnAutoComplete;
+				data->InsertChars(static_cast<int>(capturedStr.size()), toAppend.c_str(), toAppend.c_str() + toAppend.size());
 			}
 			return 0;
 		},
-		&userQuery);
+		&context);
 
 	if (ImGui::IsWindowAppearing())
 	{
@@ -129,13 +138,25 @@ void ImSearch::SearchBar(const char* hint)
 	const ImVec2 iconTopLeft{ lensCentre.x - lensRadius, lensCentre.y - lensRadius };
 	const ImRect iconRect{ iconTopLeft, handleBottomRight };
 
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	const ImU32 disabledTextCol = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+
 	if (availRect.Contains(iconRect))
 	{
-		const ImU32 col = ImGui::GetColorU32(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+		drawList->AddCircle(lensCentre, lensRadius, disabledTextCol);
+		drawList->AddLine(handleTopLeft, handleBottomRight, disabledTextCol);
+	}
 
-		ImDrawList* drawList = ImGui::GetWindowDrawList();
-		drawList->AddCircle(lensCentre, lensRadius, col);
-		drawList->AddLine(handleTopLeft, handleBottomRight, col);
+	if (!userQuery.empty()
+		&& ImGui::IsItemFocused())
+	{
+		ImVec2 completePreviewPos = ImGui::GetItemRectMin();
+		completePreviewPos.x += ImGui::CalcTextSize(userQuery.c_str(), userQuery.c_str() + userQuery.size()).x;
+
+		completePreviewPos.x += ImGui::GetStyle().FramePadding.x;
+		completePreviewPos.y += ImGui::GetStyle().FramePadding.y;
+
+		drawList->AddText(completePreviewPos, disabledTextCol, context.mResult.mOutput.mToAppendOnAutoComplete.c_str());
 	}
 }
 
@@ -305,6 +326,7 @@ void ImSearch::BringResultUpToDate(Result& result)
 	PropagateScoreToChildren(result.mInput, result.mBuffers);
 	PropagateScoreToParents(result.mInput, result.mBuffers);
 	GenerateDisplayOrder(result.mInput, result.mBuffers, result.mOutput);
+	FindStringToAppendOnAutoComplete(result.mInput, result.mOutput);
 }
 
 void ImSearch::AssignInitialScores(const Input& input, ReusableBuffers& buffers)
@@ -443,6 +465,55 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 	}
 }
 
+void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& output)
+{
+	output.mToAppendOnAutoComplete.clear();
+
+	const std::vector<std::string> tokensInQuery = SplitTokens(input.mUserQuery);
+
+	if (tokensInQuery.empty())
+	{
+		return;
+	}
+
+	const StrView tokenToComplete = tokensInQuery.back();
+
+	const std::vector<IndexT>& displayOrder = output.mDisplayOrder;
+
+	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
+	{
+		const IndexT indexAndFlag = *it;
+		const IndexT index = indexAndFlag & ~Output::sDisplayEndFlag;
+		const IndexT isEnd = indexAndFlag & Output::sDisplayEndFlag;
+
+		if (isEnd)
+		{
+			continue;
+		}
+
+		const Searchable& searchable = input.mEntries[index];
+		const std::vector<std::string> tokens = SplitTokens(searchable.mText);
+
+		for (const StrView token : tokens)
+		{
+			if (token.size() <= tokenToComplete.size())
+			{
+				continue;
+			}
+
+			const StrView tokenSubStr = { token.mData, tokenToComplete.size() };
+
+			if (!(tokenSubStr == tokenToComplete))
+			{
+				continue;
+			}
+
+			output.mToAppendOnAutoComplete = { token.data() + tokenToComplete.size(), token.size() - tokenToComplete.size() };
+			return;
+		}
+	}
+}
+
 void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 {
 	const bool isUserSearching = !result.mInput.mUserQuery.empty();
@@ -566,6 +637,15 @@ void ImSearch::Callback::ClearData()
 	mData = nullptr;
 }
 
+bool ImSearch::operator==(const StrView& lhs, const StrView& rhs)
+{
+	return lhs.mSize == rhs.mSize && 
+		(
+			(lhs.mData == nullptr && rhs.mData == nullptr) 
+			|| memcmp(lhs.mData, rhs.mData, lhs.mSize) == 0
+		);
+}
+
 bool ImSearch::operator==(const Searchable& lhs, const Searchable& rhs)
 {
 	return lhs.mText == rhs.mText
@@ -641,7 +721,7 @@ std::vector<std::string> ImSearch::SplitTokens(StrView s)
 	{
 		if (std::isalnum(static_cast<unsigned char>(c)))
 		{
-			current += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+			current += c;
 			continue;
 		}
 
@@ -678,7 +758,13 @@ std::string ImSearch::MakeTokenisedString(StrView original)
 {
 	std::vector<std::string> targetTokens = SplitTokens(original);
 	std::sort(targetTokens.begin(), targetTokens.end());
-	const std::string processedTarget = Join(targetTokens);
+	std::string processedTarget = Join(targetTokens);
+	
+	for (char& c : processedTarget)
+	{
+		c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+	}
+
 	return processedTarget;
 }
 
