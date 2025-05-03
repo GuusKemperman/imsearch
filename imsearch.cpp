@@ -88,21 +88,28 @@ void ImSearch::SearchBar(const char* hint)
 		hint,
 		const_cast<char*>(userQuery.c_str()),
 		userQuery.capacity() + 1,
-		ImGuiInputTextFlags_CallbackResize,
+		ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_CallbackCompletion,
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
-			std::string* str = static_cast<std::string*>(data->UserData);
+			LocalContext* capturedContext = static_cast<LocalContext*>(data->UserData);
+			std::string& capturedStr = capturedContext->mInput.mUserQuery;
+
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 			{
 				// Resize string callback
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-				IM_ASSERT(data->Buf == str->c_str());
-				str->resize(static_cast<size_t>(data->BufTextLen));
-				data->Buf = const_cast<char*>(str->c_str());
+				IM_ASSERT(data->Buf == capturedStr.c_str());
+				capturedStr.resize(static_cast<size_t>(data->BufTextLen));
+				data->Buf = const_cast<char*>(capturedStr.c_str());
+			}
+			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+			{
+				const std::string& toAppend = capturedContext->mResult.mOutput.mStringToAppendOnAutoComplete;
+				data->InsertChars(static_cast<int>(capturedStr.size()), toAppend.c_str(), toAppend.c_str() + toAppend.size());
 			}
 			return 0;
 		},
-		&userQuery);
+		&context);
 
 	if (ImGui::IsWindowAppearing())
 	{
