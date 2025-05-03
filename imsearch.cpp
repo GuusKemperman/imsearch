@@ -152,6 +152,7 @@ void ImSearch::Submit()
 
 	DisplayToUser(context, lastValidResult);
 
+	context.mHasSubmitted = true;
 	context.mInput.mEntries.clear();
 	context.mDisplayCallbacks.clear();
 	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
