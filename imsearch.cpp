@@ -102,6 +102,12 @@ void ImSearch::SearchBar(const char* hint)
 		},
 		&userQuery);
 
+	if (ImGui::IsWindowAppearing())
+	{
+		ImGui::SetKeyboardFocusHere();
+		userQuery.clear();
+	}
+
 	// Some logic for drawing the search icon
 	const ImVec2 hintSize = ImGui::CalcTextSize(hint);
 	ImRect availRect{ ImGui::GetItemRectMin(), ImGui::GetItemRectMax() };
@@ -130,12 +136,6 @@ void ImSearch::SearchBar(const char* hint)
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
 		drawList->AddCircle(lensCentre, lensRadius, col);
 		drawList->AddLine(handleTopLeft, handleBottomRight, col);
-	}
-
-	if (ImGui::IsWindowAppearing())
-	{
-		ImGui::SetKeyboardFocusHere();
-		userQuery.clear();
 	}
 }
 
