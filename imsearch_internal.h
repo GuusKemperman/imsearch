@@ -119,6 +119,8 @@ namespace ImSearch
 		std::vector<Searchable> mEntries{};
 		std::vector<float> mBonuses{};
 		std::string mUserQuery{};
+	
+		bool mReverseDisplayOrder{};
 	};
 
 	struct ReusableBuffers
@@ -184,14 +186,18 @@ namespace ImSearch
 	// is not actively searching, for performance and memory reasons.
 	bool CanCollectSubmissions();
 
+	void ReverseDisplayOrder();
+
 	//-----------------------------------------------------------------------------
 	// [SECTION] Testing
 	//-----------------------------------------------------------------------------
 
-	float GetScore(size_t index);
+	float GetScore(IndexT index);
 
-	size_t GetDisplayOrderEntry(size_t index);
+	IndexT GetDisplayOrderEntry(IndexT index);
 	
+	IndexT GetTotalNumDisplayed();
+
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions
 	//-----------------------------------------------------------------------------

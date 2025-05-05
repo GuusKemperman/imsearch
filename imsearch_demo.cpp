@@ -3,6 +3,7 @@
 #include "imsearch.h"
 #include "imsearch_internal.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <chrono>
 #include <array>
@@ -13,8 +14,9 @@ namespace
 {
 	std::array<const char*, 100> nouns{ "people","history","way","art","world","information","map","two","family","government","health","system","computer","meat","year","thanks","music","person","reading","method","data","food","understanding","theory","law","bird","literature","problem","software","control","knowledge","power","ability","economics","love","internet","television","science","library","nature","fact","product","idea","temperature","investment","area","society","activity","story","industry","media","thing","oven","community","definition","safety","quality","development","language","management","player","variety","video","week","security","country","exam","movie","organization","equipment","physics","analysis","policy","series","thought","basis","boyfriend","direction","strategy","technology","army","camera","freedom","paper","environment","child","instance","month","truth","marketing","university","writing","article","department","difference","goal","news","audience","fishing","growth" };
 	std::array<const char*, 100> adjectives{ "different","used","important","every","large","available","popular","able","basic","known","various","difficult","several","united","historical","hot","useful","mental","scared","additional","emotional","old","political","similar","healthy","financial","medical","traditional","federal","entire","strong","actual","significant","successful","electrical","expensive","pregnant","intelligent","interesting","poor","happy","responsible","cute","helpful","recent","willing","nice","wonderful","impossible","serious","huge","rare","technical","typical","competitive","critical","electronic","immediate","aware","educational","environmental","global","legal","relevant","accurate","capable","dangerous","dramatic","efficient","powerful","foreign","hungry","practical","psychological","severe","suitable","numerous","sufficient","unusual","consistent","cultural","existing","famous","pure","afraid","obvious","careful","latter","unhappy","acceptable","aggressive","boring","distinct","eastern","logical","reasonable","strict","administrative","automatic","civil" };
-
-	size_t Rand(size_t& seed);
+    std::array<const char*, 566> commands{ "a.AuditLoadedAnimGraphs","a.Sharing.Enabled","a.Sharing.ToggleVisibility","abtest","Accessibility.DumpStatsSlate","Accessibility.DumpStatsWindows","ACL.ListAnimSequences","ACL.ListCodecs","ACL.SetDatabaseVisualFidelity","AddWork","ai.debug.nav.DirtyAreaAroundPlayer","ai.debug.nav.DrawDistance","AnimRecorder.SampleRate","AssetManager.AssetAudit","AssetManager.DumpAssetDependencies","AssetManager.DumpAssetRegistry","AssetManager.DumpAssetRegistryInfo","AssetManager.DumpBundlesForAsset","AssetManager.DumpLoadedAssets","AssetManager.DumpReferencersForPackage","AssetManager.DumpTypeSummary","AssetManager.FindDepChain","AssetManager.FindDepClasses","AssetManager.LoadPrimaryAssetsWithType","AssetManager.UnloadPrimaryAssetsWithType","AssetRegistry.Debug.FindInvalidUAssets","AssetRegistry.DumpAllocatedSize","AssetRegistry.DumpState","AssetRegistry.GetByClass","AssetRegistry.GetByName","AssetRegistry.GetByPath","AssetRegistry.GetByTag","AssetRegistry.GetDependencies","AssetRegistry.GetReferencers","AssetRegistry.ScanPath","AssetTools.LogFolderPermissions","au.3dVisualize.Attenuation","au.AudioSourceManager.HangDiagnostics","au.AudioThreadCommand.ChokeCommandQueue","au.AudioThreadCommand.ChokeMPSCCommandQueue","au.AudioThreadCommand.SpamCommandQueue","au.ClearMutesAndSolos","au.debug.bufferdiagnostics","au.Debug.Modulation","au.Debug.PlaySoundCue","au.Debug.PlaySoundWave","au.Debug.SoundCues","au.Debug.SoundMixes","au.Debug.SoundReverb","au.Debug.Sounds","au.Debug.SoundWaves","au.Debug.StopSound","au.Debug.Streaming","au.DumpActiveSounds","au.DumpBakedAnalysisData","au.MetaSound.Experimental.OperatorPool.SetMaxNumOperators","au.Metasound.Profiling.AddNodes","au.Metasound.Profiling.ListNodes","au.Metasound.Profiling.RemoveNodes","au.Modulation.SetPitchRange","au.ReportAudioDevices","au.SourceFadeMin","au.spatialization.ListAvailableSpatialPlugins","au.spatialization.SetCurrentSpatialPlugin","au.streamcaching.FlushAudioCache","au.streamcaching.ResizeAudioCacheTo","au.streamcaching.StartProfiling","au.streamcaching.StopProfiling","au.submix.drawgraph","AudioThread.TaskPriority","bp.AuditFunctionCallsForBlueprint","bp.AuditThreadSafeFunctions","BP.DumpAllRegisteredNamespacePaths","BP.ToggleUsePackagePathAsDefaultNamespace","c.ToggleGPUCrashedFlagDbg","CancelAllTasks","CollectionManager.Add","CollectionManager.Create","CollectionManager.Destroy","CollectionManager.Remove","Collision.ListChannels","Collision.ListComponentsWithResponseToProfile","Collision.ListObjectsWithCollisionComplexity","Collision.ListProfiles","Collision.ListProfilesWithResponseToChannel","ContentBrowser.Debug.ConvertInternalPathToVirtual","ContentBrowser.Debug.TryConvertVirtualPath","ControlRig.Hierarchy.Trace","ControlRig.LoadAllAssets","CoreUObject.AttemptToFindShortTypeNamesInMetaData","CoreUObject.AttemptToFindUninitializedScriptStructMembers","CPUTime.Dump","CreateDummyFileInPersistentStorage","CsvCategory","CsvProfile","CustomTimeStep.reset","D3D12.DumpRayTracingGeometries","D3D12.DumpRayTracingGeometriesToCSV","D3D12.DumpTrackedAllocationCallstacks","D3D12.DumpTrackedAllocations","D3D12.DumpTrackedResidentAllocationCallstacks","D3D12.DumpTrackedResidentAllocations","D3D12.RayTracing.SerializeScene","DDC.LoadReplay","DDC.MountPak","DDC.UnmountPak","Demo.ActorPrioritizationEnabled","Demo.CheckpointSaveMaxMSPerFrame","Demo.MaxDesiredRecordTimeMS","Demo.SetLocalViewerOverride","Demo.TestWriteEvent","diff","dp.Override.Restore","DumpCCmds","DumpConsoleCommands","DumpCVars","DumpDetailedPrimitives","DumpGPU","DumpLevelCollections","DumpLightmapSizeOnDisk","DumpLLM","DumpNiagaraWorldManager","DumpPackagePayloadInfo","DumpPersistentStorage","DumpPrimitives","dumpticks","DumpUnbuiltLightInteractions","DumpVisibleActors","Editor.AsyncAssetCompilationFinishAll","Editor.AsyncAssetDumpStallStacks","Editor.AsyncSkinnedAssetCompilationFinishAll","Editor.AsyncSoundWaveCompilationFinishAll","Editor.AsyncStaticMeshCompilationFinishAll","Editor.AsyncTextureCompilationFinishAll","Editor.Debug.SlowTask.Simulate","Editor.EnableInViewportMenu","Editor.ObjectReverseLookupValidate","Editor.ResizeMainFrame","EditorDomain.DumpClassDigests","EnableGDT","EnhancedInput.DumpKeyProfileToLog","EnhancedInput.SaveKeyProfilesToSlot","FindRedundantMICS","FName.Dump","FName.DumpNumbered","FName.HashCsv","FName.List","FName.ListNumbered","FName.Stats","foliage.Freeze","foliage.LogFoliageFrame","foliage.RebuildFoliageTrees","foliage.Test","foliage.ToggleVectorCull","foliage.UnFreeze","FontAtlasVisualizer","ForceBuildStreamingData","fx.DumpCompileIdDataForAsset","fx.DumpEmitterDepencenciesInFolder","FX.DumpNCPoolInfo","fx.DumpNiagaraScalabilityState","fx.DumpPSCPoolInfo","fx.DumpPSCTickStateInfo","fx.DumpRapidIterationParametersForAsset","fx.InvalidateCachedScripts","fx.InvalidateNiagaraPerfBaselines","fx.LoadAllNiagaraSystemsInFolder","fx.Niagara.DataChannels.DumpWriteLog","fx.Niagara.DataChannels.ResetLayoutInfo","fx.Niagara.Debug.Hud","fx.Niagara.Debug.KillSpawned","fx.Niagara.Debug.PlaybackMode","fx.Niagara.Debug.PlaybackRate","fx.Niagara.Debug.SpawnComponent","fx.Niagara.DumpComponents","fx.Niagara.FixDuplicateVariableGuids","fx.Niagara.RenderTarget.OverrideFormat","fx.Niagara.Scalability.CullingMode","fx.Niagara.SetOverridePlatformName","fx.Niagara.SetOverrideQualityLevel","fx.Niagara.TaskPriorities.Dump","fx.Niagara.TaskPriorities.RunTest","fx.Niagara.ValidateDuplicateVariableGuids","fx.NiagaraEditor.ReinitializeStyle","fx.NiagaraEditorWidgets.ReinitializeStyle","fx.ParticlePerfStats.RunTest","fx.PreventAllSystemRecompiles","fx.PreventSystemRecompile","fx.PSCMan.Dump","fx.RebuildDirtyScripts","FX.RestartAll","fx.TestCompileNiagaraScript","fx.UpgradeAllNiagaraAssets","GameplayMediaEncoder.Initialize","GameplayMediaEncoder.Shutdown","GameplayMediaEncoder.Start","GameplayMediaEncoder.Stop","GameplayTags.DumpTagList","GameplayTags.PackingTest","GameplayTags.PrintNetIndices","GameplayTags.PrintReplicationFrequencyReport","GameplayTags.PrintReplicationIndicies","GameplayTags.PrintReport","gc.CalculateHistorySize","gc.DebugGraphHide","gc.DebugGraphShow","gc.DumpMemoryStats","gc.DumpRefsToCluster","gc.DumpSchemaStats","gc.FindStaleClusters","gc.GenerateReachabilityStressData","gc.HistorySize","gc.ListClusters","gc.SuggestClusters","gc.UnlinkReachabilityStressData","gdt.Enable","gdt.EnableCategoryName","gdt.fontsize","gdt.SelectLocalPlayer","gdt.SelectNextRow","gdt.SelectPreviousRow","gdt.Toggle","gdt.ToggleCategory","geomcache.TriggerBulkDataCrash","geometry.DynamicMesh.ClearDebugMeshes","GeometryCollection.BuildProximityDatabase","GeometryCollection.ClusterAlongYZPlane","GeometryCollection.CreateFromSelectedActors","GeometryCollection.CreateFromSelectedAssets","GeometryCollection.DeleteCoincidentVertices","GeometryCollection.DeleteGeometry","GeometryCollection.DeleteHiddenFaces","GeometryCollection.DeleteStaleVertices","GeometryCollection.DeleteZeroAreaFaces","GeometryCollection.Heal","GeometryCollection.PrintDetailedStatistics","GeometryCollection.PrintDetailedStatisticsSummary","GeometryCollection.PrintStatistics","GeometryCollection.SelectAllGeometry","GeometryCollection.SelectInverseGeometry","GeometryCollection.SelectLessThenVolume","GeometryCollection.SelectNone","GeometryCollection.SetNamedAttributeValues","GeometryCollection.SetupNestedBoneAsset","GeometryCollection.SetupTwoClusteredCubesAsset","GeometryCollection.ToString","GeometryCollection.WriteToHeaderFile","GeometryCollection.WriteToOBJFile","GPUDebugCrash","grass.DumpExclusionBoxes","grass.DumpGrassData","grass.FlushCache","grass.FlushCachePIE","help","HighlightRecorder.Pause","HighlightRecorder.Resume","HighlightRecorder.Save","HighlightRecorder.Start","HighlightRecorder.Stop","HighResShot","Ias.AbandonCache","Input.+action","Input.+key","Input.-action","Input.-key","Input.ListAllHardwareDevices","ism.Editor.DumpISMPartitionActors","Landscape.ClearDirty","landscape.DumpLODs","Landscape.FixSplines","Landscape.Patches","Landscape.Static","LazyLoad.PrintUnresolvedObjects","LevelEditor.ToggleImmersive","ListTimers","LiveCoding","LiveCoding.Compile","LLMSnapshot","LoadPackage","LoadPackageAsync","LoadTimes.DumpReport","LoadTimes.DumpTracking","LoadTimes.DumpTrackingLow","LoadTimes.Reset","LoadTimes.ResetTracking","LoadTimes.StartAccumulating","LoadTimes.StopAccumulating","Localization.DumpLiveTable","LogCountedInstances","ls.PrintNumLandscapeShadows","MainFrame.ToggleFullscreen","mallocleak.clear","mallocleak.report","mallocleak.start","mallocleak.stop","MallocStomp.OverrunTest","MallocStomp2.Disable","MallocStomp2.Enable","MallocStomp2.MaxSize","MallocStomp2.MinSize","MallocStomp2.OverrunTest","MappedFileTest","Memory.StaleTest","Memory.UsePoison","Memory.UsePurgatory","merge","MessageBus.UDP.ClearDenyList","Metadata.Dump","net.ActorReport","Net.CreateBandwidthGenerator","net.DeleteDormantActor","net.DisconnectSimulatedConnections","net.DumpRelevantActors","net.ForceOnePacketPerBunch","Net.GenerateConstantBandwidth","Net.GeneratePeriodicBandwidthSpike","Net.Iris.DebugNetInternalIndex","Net.Iris.DebugNetRefHandle","Net.Iris.PrintAlwaysRelevantObjects","Net.Iris.PrintDynamicFilterClassConfig","Net.Iris.PrintNetCullDistances","Net.Iris.PrintRelevantObjects","Net.Iris.PrintRelevantObjectsToConnection","Net.Iris.PrintReplicatedObjects","net.ListActorChannels","net.ListNetGUIDExports","net.ListNetGUIDs","net.Packagemap.FindNetGUID","net.PrintNetConnections","Net.PushModelPrintHandles","net.SimulateConnections","net.TestObjRefSerialize","NetEmulation.DropAnyUnreliable","NetEmulation.DropNothing","NetEmulation.DropUnreliableOfActorClass","NetEmulation.DropUnreliableOfSubObjectClass","NetEmulation.DropUnreliableRPC","NetEmulation.Off","NetEmulation.PktDup","NetEmulation.PktEmulationProfile","NetEmulation.PktIncomingLagMax","NetEmulation.PktIncomingLagMin","NetEmulation.PktIncomingLoss","NetEmulation.PktJitter","NetEmulation.PktLag","NetEmulation.PktLagMax","NetEmulation.PktLagMin","NetEmulation.PktLagVariance","NetEmulation.PktLoss","NetEmulation.PktOrder","NetTrace.SetTraceVerbosity","NiagaraDebugHud","NiagaraReportSystemMemory","online.ResetAchievements","p.chaos.dumphierarcystats","p.Chaos.StartVDRecording","p.Chaos.StopVDRecording","p.Chaos.VD.SetCVDDataChannelEnabled","p.Chaos.VD.SpawnNewCVDInstance","p.ChaosCloth.Ispc","p.DumpPhysicalMaterialMaskData","PackageName.ConvertFilenameToLongPackageName","PackageName.ConvertLongPackageNameToFilename","PackageName.DumpMountPoints","PackageName.RegisterMountPoint","PackageName.UnregisterMountPoint","PackageTools.ReloadPackage","pak.AsyncFileTest","pak.TestRegisterEncryptionKey","PakFileTest","PersistentStorageCategoryStats","r.AOListMemory","r.AOListMeshDistanceFields","r.CopyLockedViews","r.DumpBufferPoolMemory","r.DumpPipelineCache","r.DumpRenderTargetPoolMemory","r.DumpShadows","r.FlushMaterialUniforms","r.HLOD","r.HLOD.ListUnbuilt","r.InvalidateCachedShaders","r.ListSceneColorMaterials","r.MeshDrawCommands.DumpStats","r.RayTracing.UpdateCachedState","r.RecompileRenderer","r.RecreateRenderStateContext","r.ResetRenderTargetsExtent","r.ResetViewState","r.RHI.Name","r.RHISetGPUCaptureOptions","r.RHIThread.Enable","r.SceneCapture.DumpMemory","r.SetFramePace","r.SetNearClipPlane","r.ShaderCompiler.PrintStats","r.ShaderPipelineCache.Close","r.ShaderPipelineCache.Open","r.ShaderPipelineCache.Save","r.ShaderPipelineCache.SetBatchMode","r.Shadow.Virtual.Visualize.DumpLightNames","r.SkylightRecapture","r.TextureProfiler.DumpRenderTargets","r.TextureProfiler.DumpTextures","r.TogglePreCulledIndexBuffers","r.VT.Dump","r.VT.DumpPoolUsage","r.VT.Flush","r.VT.FlushAndEvictFileCache","r.VT.ListPhysicalPools","r.VT.SaveAllocatorImages","r.VT.ShowDecodeErrors","Reattach.Components","Reattach.MaterialInstances","Reattach.Materials","RedirectCollector.ResolveAllSoftObjectPaths","RedirectToFile","ReferenceInfo","ReloadGlobalShaders","rhi.DumpMemory","rhi.DumpResourceCounts","rhi.DumpResourceMemory","RunTask","SequenceRecorder","SetGlobalShaderCacheOverrideDirectory","SetThreadConfig","ShrinkUObjectHashTables","Slate.Commands.ListAll","Slate.Commands.ListBound","Slate.DeleteResources","Slate.DumpUpdateList","Slate.Navigation.Simulate","Slate.TestMessageDialog","Slate.TestMessageLog","Slate.TestNotifications","Slate.TestProgressNotification","Slate.TriggerInvalidate","SlateDebugger.Break.OnWidgetBeginPaint","SlateDebugger.Break.OnWidgetEndPaint","SlateDebugger.Break.OnWidgetInvalidation","SlateDebugger.Break.RemoveAll","SlateDebugger.Event.DisableAllFocusFilters","SlateDebugger.Event.DisableAllInputFilters","SlateDebugger.Event.EnableAllFocusFilters","SlateDebugger.Event.EnableAllInputFilters","SlateDebugger.Event.SetFocusFilter","SlateDebugger.Event.SetInputFilter","SlateDebugger.Event.Start","SlateDebugger.Event.Stop","SlateDebugger.Invalidate.SetInvalidateRootReasonFilter","SlateDebugger.Invalidate.SetInvalidateWidgetReasonFilter","SlateDebugger.Invalidate.Start","SlateDebugger.Invalidate.Stop","SlateDebugger.InvalidationRoot.Start","SlateDebugger.InvalidationRoot.Stop","SlateDebugger.InvalidationRoot.ToggleLegend","SlateDebugger.InvalidationRoot.ToggleWidgetNameList","SlateDebugger.Paint.LogOnce","SlateDebugger.Paint.Start","SlateDebugger.Paint.Stop","SlateDebugger.Paint.ToggleWidgetNameList","SlateDebugger.Start","SlateDebugger.Stop","SlateDebugger.Update.SetWidgetUpdateFlagsFilter","SlateDebugger.Update.Start","SlateDebugger.Update.Stop","SlateDebugger.Update.ToggleLegend","SlateDebugger.Update.ToggleUpdateFromPaint","SlateDebugger.Update.ToggleWidgetNameList","sm.DerivedDataTimings","SparseDelegateReport","spawnactortimer","StartWorkTest","Stat MapBuildData","stats.NamedEvents","stats.VerboseNamedEvents","StopWorkTest","SynthBenchmark","TaskGraph.ABTestThreads","TaskGraph.Benchmark","TaskGraph.NumWorkerThreadsToIgnore","TaskGraph.Randomize","TaskGraph.TaskThreadPriority","TaskGraph.TestLockFree","TaskGraph.TestLowToHighPri","TextAssetTool","TextureAtlasVisualizer","tick.AddIndirectTestTickFunctions","tick.AddTestTickFunctions","tick.RemoveTestTickFunctions","TimecodeProvider.reset","TimedMemReport.Delay","ToggleForceDefaultMaterial","ToggleLight","ToggleReversedIndexBuffers","ToggleShadowIndexBuffers","ToolMenus.Edit","ToolMenus.RefreshAllWidgets","Trace.Bookmark","Trace.Disable","Trace.Enable","Trace.File","Trace.Pause","Trace.Resume","Trace.Screenshot","Trace.Send","Trace.SnapshotFile","Trace.SnapshotSend","Trace.Start","Trace.Status","Trace.Stop","TraceFilter.FlushState","TrackAsyncLoadRequests.Dump","TrackAsyncLoadRequests.DumpToFile","TrackAsyncLoadRequests.Reset","TriggerFailedWindowsRead","TypedElements.OutputRegistredTypeElementsToClipboard","UAssetLoadTest","ValidatePackagePayloads","VerifyPersistentStorageCategory","VI.ForceMode","Vis","VisRT","VisualGraphUtils.ControlRig.TraverseHierarchy","VisualGraphUtils.Object.CollectReferences","VisualGraphUtils.Object.CollectTickables","VisualGraphUtils.Object.LogClassNames","VisualGraphUtils.Object.LogInstancesOfClass","VisualizeTexture","voice.sendLocalTalkersToEndpoint","voice.sendRemoteTalkersToEndpoint","VREd.ForceVRMode","VREd.ToggleDebugMode","Widget.DumpTemplateSizes","WidgetReflector","WidgetReflector.TakeSnapshot","WindowsApplication.ApplyLowLevelMouseFilter","WindowsApplication.RemoveLowLevelMouseFilter","WorldMetrics.SelfTest","wp.Editor.DumpActorDesc","wp.Editor.DumpActorDescs","wp.Editor.DumpClassDescs","wp.Editor.DumpStreamingGenerationLog","wp.Editor.HLOD.DumpStats","wp.Editor.ToggleShowEditorProfiling","wp.Runtime.DebugFilterByCellName","wp.Runtime.DebugFilterByDataLayer","wp.Runtime.DebugFilterByRuntimeHashGridName","wp.Runtime.DebugFilterByStreamingStatus","wp.Runtime.DrawWorldPartitionIndex","wp.Runtime.DumpDataLayers","wp.Runtime.DumpStreamingSources","wp.Runtime.DumpWorldPartitions","wp.Runtime.HLOD","wp.Runtime.OverrideRuntimeSpatialHashLoadingRange","wp.Runtime.SetDataLayerRuntimeState","wp.Runtime.SetLogWorldPartitionVerbosity","wp.Runtime.ToggleDataLayerActivation","wp.Runtime.ToggleDrawDataLayers","wp.Runtime.ToggleDrawDataLayersLoadTime","wp.Runtime.ToggleDrawLegends","wp.Runtime.ToggleDrawRuntimeCellsDetails","wp.Runtime.ToggleDrawRuntimeHash2D","wp.Runtime.ToggleDrawRuntimeHash3D","wp.Runtime.ToggleDrawStreamingPerfs","wp.Runtime.ToggleDrawStreamingSources" };
+	
+    size_t Rand(size_t& seed);
 	const char* GetRandomString(size_t& seed, std::string& str);
 
     void HelpMarker(const char* desc);
@@ -913,6 +915,134 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                 ImSearch::PopSearchable();
             }
 
+            ImSearch::EndSearch();
+        }
+
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Console"))
+    {
+        if (ImSearch::BeginSearch())
+        {
+            ImSearch::SearchBar("Enter Commands");
+
+            ImGuiID input_text_id = ImGui::GetItemID();
+            const bool input_text_active = ImGui::IsItemActive();
+            ImGuiInputTextState* input_state = input_text_active ? ImGui::GetInputTextState(input_text_id) : nullptr;
+
+            // Using an external Shortcut() while active would work neatly instead of using CallbackCompletion,
+            // now that we have access to ImGuiInputTextState::ReloadUserBufAndMoveToEnd().
+            // But would require a little bit of custom text insertion code, for now using CallbackCompletion.
+            //if (input_text_active && Shortcut(ImGuiKey_Tab, ImGuiInputFlags_None, input_text_id))
+            //    InputTextWithCombo_HandleCompletion();
+
+            if (input_text_active)
+            {
+                ImGui::OpenPopup("SuggestionPopup", ImGuiPopupFlags_NoReopen);
+            }
+
+            // Position and size popup
+            ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + ImGui::GetStyle().ItemSpacing.y));
+            ImGui::SetNextWindowSize({ ImGui::GetCurrentContext()->LastItemData.NavRect.GetWidth(), 0 }, ImGuiCond_Appearing);
+            
+            // Popup
+            // - use ImGuiWindowFlags_NoFocusOnAppearing to avoid losing active id.
+            //   without _ChildWindow this would make us stays behind on subsequent reopens.
+            // - use ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_NavFlattened: even though we use _NoNav this makes us share the focus scope,
+            //   allowing e.g. Shortcut() to work from within the child when parent inputtext is focused.
+            //   (or if we used normal navigation this would permit request to be handled while InputText is focused)
+            // - use ImGuiWindowFlags_NoNav and handle keys ourselves (it's currently easier)
+            ImGuiWindowFlags popup_window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+            popup_window_flags |= ImGuiWindowFlags_NoFocusOnAppearing;
+            popup_window_flags |= ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_NavFlattened;
+            popup_window_flags |= ImGuiWindowFlags_NoNav;
+            if (ImGui::BeginPopupEx(ImGui::GetID("SuggestionPopup"), popup_window_flags))
+            {
+                const bool popup_is_appearing = ImGui::IsWindowAppearing();
+
+                const int cursor_idx_prev = ImGui::GetStateStorage()->GetInt(ImGui::GetID("CursorIdx"), -1);
+                int cursor_idx = cursor_idx_prev;
+
+                if (popup_is_appearing
+                    || (input_state != nullptr && input_state->Edited))
+                {
+                    cursor_idx = -1;
+                }
+
+                const int totalNumDisplayed = static_cast<int>(ImSearch::GetTotalNumDisplayed());
+
+                // Custom keyboard navigation
+                if (ImGui::Shortcut(ImGuiKey_DownArrow, ImGuiInputFlags_Repeat, input_text_id) 
+                    && totalNumDisplayed > 0)
+                {
+                    cursor_idx = (cursor_idx + 1) % totalNumDisplayed;
+                }
+                if (ImGui::Shortcut(ImGuiKey_UpArrow, ImGuiInputFlags_Repeat, input_text_id) 
+                    && totalNumDisplayed > 0)
+                {
+                    cursor_idx = (cursor_idx - 1 + totalNumDisplayed) % totalNumDisplayed;
+                }
+                if (ImGui::Shortcut(ImGuiKey_PageUp, 0, input_text_id)) {} // Steal that away from navigation
+                if (ImGui::Shortcut(ImGuiKey_PageDown, 0, input_text_id)) {}
+
+                int numDisplayed{};
+
+                // Suggestion list
+                for (int item_idx = 0; item_idx < static_cast<int>(commands.size()); item_idx++)
+                {
+                    ImSearch::SearchableItem(commands[static_cast<size_t>(item_idx)],
+                        [&](const char* name)
+                        {
+                            if (popup_is_appearing && strcmp(ImSearch::GetUserQuery(), name) == 0)
+                                cursor_idx = numDisplayed;
+
+                            const bool isSelected = cursor_idx == numDisplayed;
+
+                            if (ImGui::Selectable(name, isSelected)
+                                || (isSelected && ImGui::IsKeyPressed(ImGuiKey_Enter)))
+                            {
+                                ImGui::ClearActiveID();
+                                ImSearch::SetUserQuery(name);
+                                ImGui::CloseCurrentPopup();
+                            }
+
+                            if (isSelected)
+                            {
+                                ImGui::ScrollToItem();
+                            }
+
+#if 1
+                            ImGuiContext& g = *ImGui::GetCurrentContext();
+                            // Nav: Replace text on navigation moves
+                            if (g.NavJustMovedToId == g.LastItemData.ID)
+                            {
+                                ImSearch::SetUserQuery(name);
+                                if (input_state != nullptr)
+                                    input_state->ReloadUserBufAndSelectAll();
+                            }
+                            if (ImGui::IsWindowAppearing() && strcmp(ImSearch::GetUserQuery(), name) == 0)
+                                ImGui::SetItemDefaultFocus();
+
+#endif
+                            numDisplayed++;
+                        });
+                }
+
+                ImSearch::Submit();
+
+                // Close popup on deactivation (unless we are mouse-clicking in our popup)
+                if (!input_text_active && !ImGui::IsWindowFocused())
+                    ImGui::CloseCurrentPopup();
+
+                // Store cursor
+                if (cursor_idx != cursor_idx_prev)
+                    ImGui::GetStateStorage()->SetInt(ImGui::GetID("CursorIdx"), cursor_idx);
+                
+                ImGui::EndPopup();
+            }
+
+           // ImSearch::ReverseDisplayOrder();
             ImSearch::EndSearch();
         }
 

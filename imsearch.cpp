@@ -82,8 +82,9 @@ void ImSearch::SearchBar(const char* hint)
 
 	ImGui::SetNextItemWidth(-FLT_MIN);
 	ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
-
+	
 	std::string& userQuery = context.mInput.mUserQuery;
+
 	ImGui::InputTextWithHint("##SearchBar",
 		hint,
 		const_cast<char*>(userQuery.c_str()),
@@ -434,6 +435,12 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 			return lhsScore > rhsScore;
 		});
 
+	if (input.mReverseDisplayOrder)
+	{
+		std::reverse(buffers.mTempIndices.begin() + startInIndicesBuffer,
+			buffers.mTempIndices.begin() + endInIndicesBuffer);
+	}
+
 	for (IndexT indexInIndicesBuffer = startInIndicesBuffer; indexInIndicesBuffer < endInIndicesBuffer; indexInIndicesBuffer++)
 	{
 		IndexT searchableIndex = buffers.mTempIndices[indexInIndicesBuffer];
@@ -659,7 +666,8 @@ bool ImSearch::operator==(const Input& lhs, const Input& rhs)
 {
 	return lhs.mUserQuery == rhs.mUserQuery
 		&& lhs.mEntries == rhs.mEntries
-		&& lhs.mBonuses == rhs.mBonuses;
+		&& lhs.mBonuses == rhs.mBonuses
+		&& lhs.mReverseDisplayOrder == rhs.mReverseDisplayOrder;
 }
 
 ImSearch::LocalContext& ImSearch::GetLocalContext()
@@ -688,7 +696,12 @@ bool ImSearch::CanCollectSubmissions()
 	return *ImSearch::GetUserQuery() != '\0';
 }
 
-float ImSearch::GetScore(size_t index)
+void ImSearch::ReverseDisplayOrder()
+{
+	GetLocalContext().mInput.mReverseDisplayOrder = true;
+}
+
+float ImSearch::GetScore(ImSearch::IndexT index)
 {
 	LocalContext& context = GetLocalContext();
 	auto& scores = context.mResult.mBuffers.mScores;
@@ -701,16 +714,31 @@ float ImSearch::GetScore(size_t index)
 	return scores[index];
 }
 
-size_t ImSearch::GetDisplayOrderEntry(size_t index)
+ImSearch::IndexT ImSearch::GetDisplayOrderEntry(ImSearch::IndexT index)
 {
 	LocalContext& context = GetLocalContext();
 	auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
 
 	if (index >= displayOrder.size())
 	{
-		return std::numeric_limits<size_t>::max();
+		return std::numeric_limits<ImSearch::IndexT>::max();
 	}
 	return displayOrder[index];
+}
+
+ImSearch::IndexT ImSearch::GetTotalNumDisplayed()
+{
+	const LocalContext& context = GetLocalContext();
+	const auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
+
+	IndexT total{};
+
+	for (IndexT flagAndIndex : displayOrder)
+	{
+		total += (flagAndIndex & Output::sDisplayEndFlag) == 0;
+	}
+
+	return total;
 }
 
 std::vector<std::string> ImSearch::SplitTokens(StrView s)
