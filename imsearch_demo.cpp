@@ -941,11 +941,10 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             {
                 ImGui::OpenPopup("SuggestionPopup", ImGuiPopupFlags_NoReopen);
             }
-
             // Position and size popup
             ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + ImGui::GetStyle().ItemSpacing.y));
             ImGui::SetNextWindowSize({ ImGui::GetCurrentContext()->LastItemData.NavRect.GetWidth(), 0 }, ImGuiCond_Appearing);
-            
+            ImGui::SetNextWindowSizeConstraints(ImVec2{}, ImVec2{ ImGui::GetCurrentContext()->LastItemData.NavRect.GetWidth(), 200.0f });
             // Popup
             // - use ImGuiWindowFlags_NoFocusOnAppearing to avoid losing active id.
             //   without _ChildWindow this would make us stays behind on subsequent reopens.
@@ -960,7 +959,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             if (ImGui::BeginPopupEx(ImGui::GetID("SuggestionPopup"), popup_window_flags))
             {
                 const bool popup_is_appearing = ImGui::IsWindowAppearing();
-
+                
                 const int cursor_idx_prev = ImGui::GetStateStorage()->GetInt(ImGui::GetID("CursorIdx"), -1);
                 int cursor_idx = cursor_idx_prev;
 
