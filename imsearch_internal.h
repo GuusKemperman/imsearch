@@ -196,7 +196,7 @@ namespace ImSearch
 
 	IndexT GetDisplayOrderEntry(IndexT index);
 	
-	IndexT GetTotalNumDisplayed();
+	IndexT GetNumItemsFilteredOut();
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions

@@ -726,19 +726,21 @@ ImSearch::IndexT ImSearch::GetDisplayOrderEntry(ImSearch::IndexT index)
 	return displayOrder[index];
 }
 
-ImSearch::IndexT ImSearch::GetTotalNumDisplayed()
+ImSearch::IndexT ImSearch::GetNumItemsFilteredOut()
 {
 	const LocalContext& context = GetLocalContext();
 	const auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
 
-	IndexT total{};
+	IndexT numInDisplayOrder{};
 
 	for (IndexT flagAndIndex : displayOrder)
 	{
-		total += (flagAndIndex & Output::sDisplayEndFlag) == 0;
+		numInDisplayOrder += (flagAndIndex & Output::sDisplayEndFlag) == 0;
 	}
+	const IndexT numSubmitted = static_cast<IndexT>(context.mResult.mInput.mEntries.size());
+	IM_ASSERT(numInDisplayOrder <= numSubmitted);
 
-	return total;
+	return numSubmitted - numInDisplayOrder;
 }
 
 std::vector<std::string> ImSearch::SplitTokens(StrView s)

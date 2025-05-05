@@ -969,7 +969,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                     cursor_idx = -1;
                 }
 
-                const int totalNumDisplayed = static_cast<int>(ImSearch::GetTotalNumDisplayed());
+                const int totalNumDisplayed = static_cast<int>(commands.size()) - static_cast<int>(ImSearch::GetNumItemsFilteredOut());
 
                 // Custom keyboard navigation
                 if (ImGui::Shortcut(ImGuiKey_DownArrow, ImGuiInputFlags_Repeat, input_text_id) 
