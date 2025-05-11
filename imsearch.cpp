@@ -105,6 +105,12 @@ void ImSearch::SearchBar(const char* hint)
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
 			{
 				const std::string& newLastToken = capturedContext->mResult.mOutput.mPreviewText;
+
+				if (newLastToken.empty())
+				{
+					return 0;
+				}
+
 				const std::vector<std::string> splitQuery = SplitTokens(capturedQuery);
 				
 				if (splitQuery.empty())
