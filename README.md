@@ -9,12 +9,12 @@ Just like ImGui, ImSearch's API does not burden the end user with state manageme
 
 <table>
   <tr>
-    <th><img src="https://github.com/user-attachments/assets/3b2a9d01-7791-42cf-8df6-40eb2e26d0df"><p>Combos</p> </th>
-    <th><img src="https://github.com/user-attachments/assets/4680dc71-ffc5-42cd-aef5-bbacaf120541"><p>Hierarchies</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/f76ca584-ff01-47e8-855b-44ef7c7c3b73"><p>Combos, previews and autocomplete</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/967e6790-fc41-43cc-bd4d-f88d09f5a9f7"><p>Hierarchies</p> </th>
   </tr>
   <tr>
-    <th><img src="https://github.com/user-attachments/assets/c35471fe-8572-4238-a238-48d9a840ebb2"><p>Collapsing headers and nested search bars</p></th>
-    <th><img src="https://github.com/user-attachments/assets/041394e7-e145-4df8-84e8-7a8ecb2e8371"><p>Custom search bars</p> </th>
+    <th><img src="https://github.com/user-attachments/assets/2748ebeb-37a5-4c10-8fd4-86b34e0f129a"><p>Collapsing headers and nested search bars</p></th>
+    <th><img src="https://github.com/user-attachments/assets/99c2c3b3-859a-4a43-8a25-724a1dfbc912"><p>Custom search bars</p> </th>
   </tr>
 </table>
 
