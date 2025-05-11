@@ -132,7 +132,7 @@ namespace ImSearch
 		std::vector<IndexT> mDisplayOrder{};
 		static constexpr IndexT sDisplayEndFlag = static_cast<IndexT>(1) << static_cast<IndexT>(std::numeric_limits<IndexT>::digits - 1);
 	
-		std::string mToAppendOnAutoComplete{};
+		std::string mPreviewText{};
 	};
 
 	struct Result
@@ -193,12 +193,24 @@ namespace ImSearch
 	size_t GetDisplayOrderEntry(size_t index);
 	
 	//-----------------------------------------------------------------------------
+	// [SECTION] Future API candidates
+	//-----------------------------------------------------------------------------
+
+	int GetNumItemsFilteredOut();
+
+	void SetPreviewText(const char* preview);
+
+	const char* GetPreviewText();
+
+	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions
 	//-----------------------------------------------------------------------------
 
 	std::vector<std::string> SplitTokens(StrView s);
 
 	std::string Join(const std::vector<std::string>& tokens);
+
+	StrView GetStringNeededToCompletePartial(StrView partial, StrView complete);
 
 	std::string MakeTokenisedString(StrView original);
 

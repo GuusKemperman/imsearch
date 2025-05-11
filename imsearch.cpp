@@ -92,20 +92,41 @@ void ImSearch::SearchBar(const char* hint)
 		+[](ImGuiInputTextCallbackData* data) -> int
 		{
 			LocalContext* capturedContext = static_cast<LocalContext*>(data->UserData);
-			std::string& capturedStr = capturedContext->mInput.mUserQuery;
+			std::string& capturedQuery = capturedContext->mInput.mUserQuery;
 
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
 			{
 				// Resize string callback
 				// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-				IM_ASSERT(data->Buf == capturedStr.c_str());
-				capturedStr.resize(static_cast<size_t>(data->BufTextLen));
-				data->Buf = const_cast<char*>(capturedStr.c_str());
+				IM_ASSERT(data->Buf == capturedQuery.c_str());
+				capturedQuery.resize(static_cast<size_t>(data->BufTextLen));
+				data->Buf = const_cast<char*>(capturedQuery.c_str());
 			}
 			if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
 			{
-				const std::string& toAppend = capturedContext->mResult.mOutput.mToAppendOnAutoComplete;
-				data->InsertChars(static_cast<int>(capturedStr.size()), toAppend.c_str(), toAppend.c_str() + toAppend.size());
+				const std::string& newLastToken = capturedContext->mResult.mOutput.mPreviewText;
+				const std::vector<std::string> splitQuery = SplitTokens(capturedQuery);
+				
+				if (splitQuery.empty())
+				{
+					return 0;
+				}
+
+				const StrView oldLastToken = splitQuery.back();
+				
+				// Find the start of the last token
+				IndexT startOfLastToken = static_cast<IndexT>(capturedQuery.size() - oldLastToken.size());
+				while (startOfLastToken > 0)
+				{
+					if (StrView{ capturedQuery.data() + startOfLastToken, oldLastToken.size() } == oldLastToken)
+					{
+						break;
+					}
+					--startOfLastToken;
+				}
+
+				data->DeleteChars(static_cast<int>(startOfLastToken), static_cast<int>(capturedQuery.size()) - static_cast<int>(startOfLastToken));
+				data->InsertChars(static_cast<int>(startOfLastToken), newLastToken.c_str(), newLastToken.c_str() + newLastToken.size());
 			}
 			return 0;
 		},
@@ -150,13 +171,26 @@ void ImSearch::SearchBar(const char* hint)
 	if (!userQuery.empty()
 		&& ImGui::IsItemFocused())
 	{
-		ImVec2 completePreviewPos = ImGui::GetItemRectMin();
-		completePreviewPos.x += ImGui::CalcTextSize(userQuery.c_str(), userQuery.c_str() + userQuery.size()).x;
+		// If the preview text was not set by us, 
+		// it may not 'complete' what has currently
+		// been typed. Check if this is the case.
+		const std::vector<std::string> splitQuery = SplitTokens(userQuery);
 
-		completePreviewPos.x += ImGui::GetStyle().FramePadding.x;
-		completePreviewPos.y += ImGui::GetStyle().FramePadding.y;
+		if (!splitQuery.empty())
+		{
+			StrView previewToDisplay = GetStringNeededToCompletePartial(splitQuery.back(), context.mResult.mOutput.mPreviewText);
 
-		drawList->AddText(completePreviewPos, disabledTextCol, context.mResult.mOutput.mToAppendOnAutoComplete.c_str());
+			if (previewToDisplay.size() > 0)
+			{
+				ImVec2 completePreviewPos = ImGui::GetItemRectMin();
+				completePreviewPos.x += ImGui::CalcTextSize(userQuery.c_str(), userQuery.c_str() + userQuery.size()).x;
+
+				completePreviewPos.x += ImGui::GetStyle().FramePadding.x;
+				completePreviewPos.y += ImGui::GetStyle().FramePadding.y;
+
+				drawList->AddText(completePreviewPos, disabledTextCol, previewToDisplay.begin(), previewToDisplay.end());
+			}
+		}
 	}
 }
 
@@ -467,7 +501,7 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 
 void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& output)
 {
-	output.mToAppendOnAutoComplete.clear();
+	output.mPreviewText.clear();
 
 	const std::vector<std::string> tokensInQuery = SplitTokens(input.mUserQuery);
 
@@ -496,20 +530,11 @@ void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& outp
 
 		for (const StrView token : tokens)
 		{
-			if (token.size() <= tokenToComplete.size())
+			if (GetStringNeededToCompletePartial(tokenToComplete, token).mSize != 0)
 			{
-				continue;
+				output.mPreviewText = { token.data(), token.size() };
+				return;
 			}
-
-			const StrView tokenSubStr = { token.mData, tokenToComplete.size() };
-
-			if (!(tokenSubStr == tokenToComplete))
-			{
-				continue;
-			}
-
-			output.mToAppendOnAutoComplete = { token.data() + tokenToComplete.size(), token.size() - tokenToComplete.size() };
-			return;
 		}
 	}
 }
@@ -713,6 +738,33 @@ size_t ImSearch::GetDisplayOrderEntry(size_t index)
 	return displayOrder[index];
 }
 
+int ImSearch::GetNumItemsFilteredOut()
+{
+	const LocalContext& context = GetLocalContext();
+	const auto& displayOrder = context.mResult.mOutput.mDisplayOrder;
+
+	int numInDisplayOrder{};
+
+	for (IndexT flagAndIndex : displayOrder)
+	{
+		numInDisplayOrder += (flagAndIndex & Output::sDisplayEndFlag) == 0;
+	}
+	const int numSubmitted = static_cast<int>(context.mResult.mInput.mEntries.size());
+	IM_ASSERT(numInDisplayOrder <= numSubmitted);
+
+	return numSubmitted - numInDisplayOrder;
+}
+
+void ImSearch::SetPreviewText(const char* preview)
+{
+	GetLocalContext().mResult.mOutput.mPreviewText = std::string{ preview };
+}
+
+const char* ImSearch::GetPreviewText()
+{
+	return GetLocalContext().mResult.mOutput.mPreviewText.c_str();
+}
+
 std::vector<std::string> ImSearch::SplitTokens(StrView s)
 {
 	std::vector<std::string> tokens{};
@@ -752,6 +804,26 @@ std::string ImSearch::Join(const std::vector<std::string>& tokens)
 		res += ' ' + tokens[i];
 	}
 	return res;
+}
+
+ImSearch::StrView ImSearch::GetStringNeededToCompletePartial(StrView partial, StrView complete)
+{
+	if (complete.size() <= partial.size())
+	{
+		return {};
+	}
+
+	const StrView tokenSubStr = { complete.mData, partial.size() };
+
+	for (IndexT i = 0; i < partial.size(); i++)
+	{
+		if (std::tolower(static_cast<unsigned char>(tokenSubStr[i])) != std::tolower(static_cast<unsigned char>(partial[i])))
+		{
+			return {};
+		}
+	}
+
+	return { complete.data() + partial.size(), complete.size() - partial.size() };
 }
 
 std::string ImSearch::MakeTokenisedString(StrView original)
