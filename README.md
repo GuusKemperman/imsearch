@@ -35,6 +35,8 @@ Just like ImGui, ImSearch's API does not burden the end user with state manageme
 
 You'll find that the API still feels very familiar to ImGui, albeit *slightly* different from what you might expect from an ImGui extension; because this extension also takes control over the order to display items in, the library uses callbacks for submitting your widgets. First, start a new search context by calling `ImSearch::BeginSearch`. Next, submit as many items as you want with the Push/PopSearchable functions, to which you provide callbacks to display your ImGui widget (e.g. `Selectable`, `Button`, `TreeNode`, etc). Finally, wrap things up with a call to `ImSearch::EndSearch()`. That's it!
 
+<table>
+
 ```cpp
 static const char* selectedString = sImguiExtensions[0];
 
@@ -61,6 +63,8 @@ if (ImGui::BeginCombo("##Extensions", selectedString))
     ImGui::EndCombo();
 }
 ```
+
+![](https://github.com/user-attachments/assets/66b73ee6-3134-472e-889f-f8dcb81f9757)
 
 ## Demos
 
