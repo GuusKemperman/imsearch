@@ -84,6 +84,13 @@ void ImSearch::SearchBar(const char* hint)
 	ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
 
 	std::string& userQuery = context.mInput.mUserQuery;
+
+	if (ImGui::IsWindowAppearing())
+	{
+		ImGui::SetKeyboardFocusHere();
+		userQuery.clear();
+	}
+
 	ImGui::InputTextWithHint("##SearchBar",
 		hint,
 		const_cast<char*>(userQuery.c_str()),
@@ -137,12 +144,6 @@ void ImSearch::SearchBar(const char* hint)
 			return 0;
 		},
 		&context);
-
-	if (ImGui::IsWindowAppearing())
-	{
-		ImGui::SetKeyboardFocusHere();
-		userQuery.clear();
-	}
 
 	// Some logic for drawing the search icon
 	const ImVec2 hintSize = ImGui::CalcTextSize(hint);
