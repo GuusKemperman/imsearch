@@ -13,8 +13,9 @@ namespace
 {
 	std::array<const char*, 100> nouns{ "people","history","way","art","world","information","map","two","family","government","health","system","computer","meat","year","thanks","music","person","reading","method","data","food","understanding","theory","law","bird","literature","problem","software","control","knowledge","power","ability","economics","love","internet","television","science","library","nature","fact","product","idea","temperature","investment","area","society","activity","story","industry","media","thing","oven","community","definition","safety","quality","development","language","management","player","variety","video","week","security","country","exam","movie","organization","equipment","physics","analysis","policy","series","thought","basis","boyfriend","direction","strategy","technology","army","camera","freedom","paper","environment","child","instance","month","truth","marketing","university","writing","article","department","difference","goal","news","audience","fishing","growth" };
 	std::array<const char*, 100> adjectives{ "different","used","important","every","large","available","popular","able","basic","known","various","difficult","several","united","historical","hot","useful","mental","scared","additional","emotional","old","political","similar","healthy","financial","medical","traditional","federal","entire","strong","actual","significant","successful","electrical","expensive","pregnant","intelligent","interesting","poor","happy","responsible","cute","helpful","recent","willing","nice","wonderful","impossible","serious","huge","rare","technical","typical","competitive","critical","electronic","immediate","aware","educational","environmental","global","legal","relevant","accurate","capable","dangerous","dramatic","efficient","powerful","foreign","hungry","practical","psychological","severe","suitable","numerous","sufficient","unusual","consistent","cultural","existing","famous","pure","afraid","obvious","careful","latter","unhappy","acceptable","aggressive","boring","distinct","eastern","logical","reasonable","strict","administrative","automatic","civil" };
-
-	size_t Rand(size_t& seed);
+    std::array<const char*, 117> sImguiExtensions = { "imgui_test_engine","ImGuiColorTextEdit","Zep","Scintilla integration","imgui-node-editor","ImNodes","imnodes","ImNodeFlow","imgui_memory_editor","imgui_hex_editor","ImPlot","ImPlot3D","imgui-plot","SimpleImGuiFlameGraph","imgui-flame-graph","Plot Var Helper","Cubic Bezier / Curve Editor","ImSequencer","ImGradient","ImCurveEdit","Gradient Color Generator","im-neo-sequencer","HImGuiAnimation","ImFileDialog","imfile","ImGuiFD","L2DFileDialog","aiekick/ImGuiFileDialog","OverShifted's Directory tree view","AirGuanZ's imgui-filebrowser","gallickgunner's ImGui-Addons","Flix01's ImGui-Addons","imgui_markdown","imgui_md","UntitledImGuiTextUtils","url/hyperlinks","DearImGui-with-IMM32","UntitledIBusHandwriting","imgui-rs-knobs","imgui-knobs","imspinner","Spinner/Loading progress indicators","Toggle Button (under Toggles)","imgui_toggle","Splitters","Stack Layout (pr/branch)","ImRAD","ImStudio","ImGuiBuilder","ImGuiDesigner","Fellow ImGui","HImGuiEditor","Dear-Design-Manager","Thread","imgui-spectrum","Software Renderer for Dear ImGui","ImSoft","Fast Software Rasterizer","Backend for Xlux","netImGui","UnrealNetImgui","imgui-ws","ImGui_WS","RemoteImGui","AndroidAppViewer","ImTui","tear imgui","midi2osc","devmidi","shric/midi","Desktop+","ImGuiVR","BIMXplorer","mpFluid CAVE Front End","imgInspect","ImGuiTexInspect","ImGuiDatePicker","BrotBoxEngine's ImGuiExtensions.cpp","Flix01's ImGui-Addons","ImGuizmo","imGuiZMO.quat","ImGui-2D-HArrow","ImOGuizmo","ImGui::Auto()","ImQuick","imgui-inspect","imgui_stdlib","TextFmt()","imgui_scoped","imgui_sugar","imguiwrap","Explicit context pointer PR/patch","Multi-Context Compositor","Cog","PropertyWatcher","UnrealImGuiTools","UnrealNetImgui","SrgImGui","ImSearch","ImGuiTextSelect","ImZoomSlider","Slider 2D and Slider 3D","imgui-notify","ImHotKey","IP Entry Box","Pie Menu","nnview","ImGui Command Palette","imlottie","ImCoolBar","InAppGpuProfiler","Flix01's ImGui-Addons","@leiradel's snippets","@nem0's snippets","@aoterodelaroza's snippets","MetricsGui","nakedeyes' UnrealImGuiTools" };
+	
+    size_t Rand(size_t& seed);
 	const char* GetRandomString(size_t& seed, std::string& str);
 
     void HelpMarker(const char* desc);
@@ -79,15 +80,17 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 
     if (ImGui::TreeNode("Combo"))
     {
-        static const char* selectedString = nouns[0];
-        if (ImGui::BeginCombo("Nouns", selectedString))
+        static const char* selectedString = sImguiExtensions[0];
+        
+        if (ImGui::BeginCombo("##Extensions", selectedString))
         {
             if (ImSearch::BeginSearch())
             {
                 ImSearch::SearchBar();
-                for (const char* noun : nouns)
+
+                for (const char* extension : sImguiExtensions)
                 {
-                    ImSearch::SearchableItem(noun,
+                    ImSearch::SearchableItem(extension,
                         [&](const char* name)
                         {
                             const bool isSelected = name == selectedString;
@@ -110,6 +113,8 @@ void ImSearch::ShowDemoWindow(bool* p_open)
         if (ImSearch::BeginSearch())
         {
         	static char query[2048]{};
+
+            ImGui::SetNextItemWidth(-FLT_MIN);
 
             const float spaceWidth = ImGui::CalcTextSize(" ").x;
             const float searchbarWidth = ImGui::GetContentRegionAvail().x;
