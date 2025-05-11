@@ -959,7 +959,7 @@ void ImSearch::ShowDemoWindow(bool* p_open)
             if (ImGui::BeginPopupEx(ImGui::GetID("SuggestionPopup"), popup_window_flags))
             {
                 const bool popup_is_appearing = ImGui::IsWindowAppearing();
-                
+
                 const int cursor_idx_prev = ImGui::GetStateStorage()->GetInt(ImGui::GetID("CursorIdx"), -1);
                 int cursor_idx = cursor_idx_prev;
 
@@ -972,12 +972,12 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                 const int totalNumDisplayed = static_cast<int>(commands.size()) - static_cast<int>(ImSearch::GetNumItemsFilteredOut());
 
                 // Custom keyboard navigation
-                if (ImGui::Shortcut(ImGuiKey_DownArrow, ImGuiInputFlags_Repeat, input_text_id) 
+                if (ImGui::Shortcut(ImGuiKey_DownArrow, ImGuiInputFlags_Repeat, input_text_id)
                     && totalNumDisplayed > 0)
                 {
                     cursor_idx = (cursor_idx + 1) % totalNumDisplayed;
                 }
-                if (ImGui::Shortcut(ImGuiKey_UpArrow, ImGuiInputFlags_Repeat, input_text_id) 
+                if (ImGui::Shortcut(ImGuiKey_UpArrow, ImGuiInputFlags_Repeat, input_text_id)
                     && totalNumDisplayed > 0)
                 {
                     cursor_idx = (cursor_idx - 1 + totalNumDisplayed) % totalNumDisplayed;
@@ -1011,19 +1011,11 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                                 ImGui::ScrollToItem();
                             }
 
-#if 1
-                            ImGuiContext& g = *ImGui::GetCurrentContext();
-                            // Nav: Replace text on navigation moves
-                            if (g.NavJustMovedToId == g.LastItemData.ID)
-                            {
-                                ImSearch::SetUserQuery(name);
-                                if (input_state != nullptr)
-                                    input_state->ReloadUserBufAndSelectAll();
-                            }
                             if (ImGui::IsWindowAppearing() && strcmp(ImSearch::GetUserQuery(), name) == 0)
+                            {
                                 ImGui::SetItemDefaultFocus();
+                            }
 
-#endif
                             numDisplayed++;
                         });
                 }
@@ -1037,11 +1029,11 @@ void ImSearch::ShowDemoWindow(bool* p_open)
                 // Store cursor
                 if (cursor_idx != cursor_idx_prev)
                     ImGui::GetStateStorage()->SetInt(ImGui::GetID("CursorIdx"), cursor_idx);
-                
+
                 ImGui::EndPopup();
             }
 
-           // ImSearch::ReverseDisplayOrder();
+            // ImSearch::ReverseDisplayOrder();
             ImSearch::EndSearch();
         }
 
