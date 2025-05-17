@@ -242,6 +242,14 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 	IM_ASSERT(name != nullptr);
 	IM_ASSERT(!context.mHasSubmitted && "Tried calling PushSearchable after EndSearch or Submit");
 
+	if (!CanCollectSubmissions())
+	{
+		// Invoke the callback immediately if the user
+		// is not actively searching, for performance
+		// and memory reasons.
+		return Callback::InvokeAsPushSearchable(vTable, functor, name);
+	}
+
 	context.mInput.mEntries.emplace_back();
 	Searchable& searchable = context.mInput.mEntries.back();
 	searchable.mText = std::string{ name };
@@ -284,17 +292,24 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 
 void ImSearch::PopSearchable()
 {
-	if (!CanCollectSubmissions())
-	{
-		return;
-	}
-
 	Internal::PopSearchable(nullptr, nullptr);
 }
 
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	LocalContext& context = GetLocalContext();
+
+	if (!CanCollectSubmissions())
+	{
+		if (functor != nullptr
+			&& vTable != nullptr)
+		{
+			Callback::InvokeAsPopSearchable(vTable, functor);
+		}
+
+		return;
+	}
+
 	const IndexT indexOfCurrentCategory = GetCurrentItem(context);
 
 	if (functor != nullptr
@@ -610,17 +625,17 @@ ImSearch::Callback::Callback(void* originalFunctor, ImSearch::Internal::VTable v
 
 	int size;
 	vTable(VTableModes::GetSize, &size, nullptr);
-	mData = static_cast<char*>(ImGui::MemAlloc(static_cast<size_t>(size)));
-	IM_ASSERT(mData != nullptr);
-	vTable(VTableModes::MoveConstruct, originalFunctor, mData);
+	mUserFunctor = ImGui::MemAlloc(static_cast<size_t>(size));
+	IM_ASSERT(mUserFunctor != nullptr);
+	vTable(VTableModes::MoveConstruct, originalFunctor, mUserFunctor);
 }
 
 ImSearch::Callback::Callback(Callback&& other) noexcept :
 	mVTable(other.mVTable),
-	mData(other.mData)
+	mUserFunctor(other.mUserFunctor)
 {
 	other.mVTable = nullptr;
-	other.mData = nullptr;
+	other.mUserFunctor = nullptr;
 }
 
 ImSearch::Callback& ImSearch::Callback::operator=(Callback&& other) noexcept
@@ -633,10 +648,10 @@ ImSearch::Callback& ImSearch::Callback::operator=(Callback&& other) noexcept
 	ClearData();
 
 	mVTable = other.mVTable;
-	mData = other.mData;
+	mUserFunctor = other.mUserFunctor;
 
 	other.mVTable = nullptr;
-	other.mData = nullptr;
+	other.mUserFunctor = nullptr;
 
 	return *this;
 }
@@ -648,25 +663,35 @@ ImSearch::Callback::~Callback()
 
 bool ImSearch::Callback::operator()(const char* name) const
 {
-	return mVTable(VTableModes::Invoke, mData, const_cast<char*>(name));
+	return InvokeAsPushSearchable(mVTable, mUserFunctor, name);
 }
 
 void ImSearch::Callback::operator()() const
 {
-	mVTable(VTableModes::Invoke, mData, nullptr);
+	InvokeAsPopSearchable(mVTable, mUserFunctor);
+}
+
+bool ImSearch::Callback::InvokeAsPushSearchable(ImSearch::Internal::VTable vTable, void* userFunctor, const char* name)
+{
+	return vTable(VTableModes::Invoke, userFunctor, const_cast<char*>(name));
+}
+
+void ImSearch::Callback::InvokeAsPopSearchable(ImSearch::Internal::VTable vTable, void* userFunctor)
+{
+	vTable(VTableModes::Invoke, userFunctor, nullptr);
 }
 
 void ImSearch::Callback::ClearData()
 {
-	if (mData == nullptr)
+	if (mUserFunctor == nullptr)
 	{
 		return;
 	}
 
-	mVTable(VTableModes::Destruct, mData, nullptr);
+	mVTable(VTableModes::Destruct, mUserFunctor, nullptr);
 
-	ImGui::MemFree(mData);
-	mData = nullptr;
+	ImGui::MemFree(mUserFunctor);
+	mUserFunctor = nullptr;
 }
 
 bool ImSearch::operator==(const StrView& lhs, const StrView& rhs)

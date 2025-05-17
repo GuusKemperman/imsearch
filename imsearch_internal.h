@@ -82,13 +82,16 @@ namespace ImSearch
 
 		~Callback();
 
-		operator bool() const { return mData != nullptr; }
+		operator bool() const { return mUserFunctor != nullptr; }
 
 		// PushSearchable
 		bool operator()(const char* name) const;
 
 		// PopSearchable
 		void operator()() const;
+
+		static bool InvokeAsPushSearchable(ImSearch::Internal::VTable vTable, void* userFunctor, const char* name);
+		static void InvokeAsPopSearchable(ImSearch::Internal::VTable vTable, void* userFunctor);
 
 		void ClearData();
 
@@ -100,8 +103,8 @@ namespace ImSearch
 			GetSize = 3
 		};
 
-		ImSearch::Internal::VTable mVTable{};
-		char* mData{};
+		Internal::VTable mVTable{};
+		void* mUserFunctor{};
 	};
 
 	struct Searchable
