@@ -578,10 +578,30 @@ void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& outp
 
 void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 {
-	const bool isUserSearching = !result.mInput.mUserQuery.empty();
+	const std::string& userQuery = result.mInput.mUserQuery;
+	const bool isUserSearching = !userQuery.empty();
 	ImGui::PushID(isUserSearching);
 
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
+
+	ImDrawList* windowDrawList = ImGui::GetWindowDrawList();
+	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
+	ImDrawList queryDrawList{ sharedData };
+	
+	IM_UNUSED(windowDrawList);
+
+	queryDrawList.AddDrawCmd();
+	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
+	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
+	queryDrawList.AddText(
+		{},
+		0xffffffff,
+		userQuery.c_str(),
+		userQuery.c_str() + userQuery.size());
+	queryDrawList.PopClipRect();
+	queryDrawList.PopTextureID();
+
+	const int drawListStart = windowDrawList->VtxBuffer.size();
 
 	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
 	{
@@ -621,6 +641,40 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		// and make sure we call the corresponding mOnDisplayEnd
 		it = std::find(it + 1, displayOrder.end(), index | Output::sDisplayEndFlag);
 		IM_ASSERT(it != displayOrder.end());
+	}
+
+	for (int matchStart = drawListStart; matchStart < windowDrawList->VtxBuffer.size() - 1 - queryDrawList.VtxBuffer.size(); matchStart++)
+	{
+		int matchEnd = matchStart + 1;
+
+		for (int j = 0; j < queryDrawList.VtxBuffer.size() - 1; j++, matchEnd++)
+		{
+			const ImDrawVert expectedCurr = queryDrawList.VtxBuffer[j];
+			const ImDrawVert expectedNext = queryDrawList.VtxBuffer[j + 1];
+
+			const ImDrawVert actualCurr = windowDrawList->VtxBuffer[matchStart + j];
+			const ImDrawVert actualNext = windowDrawList->VtxBuffer[matchStart + j + 1];
+
+			const ImVec2 expectedDelta = { expectedNext.pos.x - expectedCurr.pos.x, expectedNext.pos.y - expectedCurr.pos.y };
+			const ImVec2 actualDelta = { actualNext.pos.x - actualCurr.pos.x, actualNext.pos.y - actualCurr.pos.y };
+
+			// use std::not_equal_to instead of != to silence -Wfloat-equal
+			// warnings, for those that want to integrate this library
+			// with a stricter codebase.
+			if (std::not_equal_to<float>{}(expectedDelta.x, actualDelta.x)
+				|| std::not_equal_to<float>{}(expectedDelta.y, actualDelta.y))
+			{
+				break;
+			}
+		}
+
+		if (matchEnd - matchStart > 1)
+		{
+			for (int i = matchStart; i < matchEnd; i++)
+			{
+				windowDrawList->VtxBuffer[i].col = 0xFFA500FF;
+			}
+		}
 	}
 
 	ImGui::PopID();
