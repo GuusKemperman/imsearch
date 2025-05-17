@@ -217,7 +217,7 @@ void ImSearch::Submit()
 	context.mHasSubmitted = true;
 	context.mInput.mEntries.clear();
 	context.mDisplayCallbacks.clear();
-	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
+	IM_ASSERT(context.mPushStackLevel == 0 && "There were more calls to PushSearchable than to PopSearchable");
 }
 
 void ImSearch::EndSearch()
@@ -247,7 +247,16 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 		// Invoke the callback immediately if the user
 		// is not actively searching, for performance
 		// and memory reasons.
-		return Callback::InvokeAsPushSearchable(vTable, functor, name);
+		const bool pushResult = Callback::InvokeAsPushSearchable(vTable, functor, name);
+
+		// We only expect a call to PopSearchable if the callback returned true.
+		// So we only increment the depth if the callback returned true.
+		if (pushResult)
+		{
+			context.mPushStackLevel++;
+		}
+
+		return pushResult;
 	}
 
 	context.mInput.mEntries.emplace_back();
@@ -287,6 +296,7 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 	}
 
 	context.mPushStack.emplace(currentIndex);
+	context.mPushStackLevel++;
 	return true;
 }
 
@@ -298,6 +308,9 @@ void ImSearch::PopSearchable()
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	LocalContext& context = GetLocalContext();
+
+	context.mPushStackLevel--;
+	IM_ASSERT(context.mPushStackLevel >= 0 && "Called PopSearchable too many times!");
 
 	if (!CanCollectSubmissions())
 	{
@@ -337,17 +350,18 @@ void ImSearch::SetRelevancyBonus(float bonus)
 
 void ImSearch::AddSynonym(const char* synonym)
 {
-	if (!CanCollectSubmissions())
-	{
-		return;
-	}
-
 	// Ensure there is an active 'parent' item
 	// to add the synonym to; no point in adding
 	// synonyms at the root level, and if you did,
 	// you did something wrong.
 	LocalContext& context = GetLocalContext();
-	(void)GetCurrentItem(context);
+
+	IM_ASSERT(context.mPushStackLevel > 0 && "AddSynonym must be called between PushSearchable and PopSearchable. See imsearch_demo.cpp");
+
+	if (!CanCollectSubmissions())
+	{
+		return;
+	}
 
 	if (Internal::PushSearchable(synonym, nullptr, nullptr))
 	{

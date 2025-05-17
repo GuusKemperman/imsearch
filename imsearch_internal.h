@@ -156,8 +156,15 @@ namespace ImSearch
 		Input mInput{};
 
 		std::vector<DisplayCallbacks> mDisplayCallbacks{};
-
 		std::stack<IndexT> mPushStack{};
+
+		// Used for debugging. We don't need
+		// to keep track of the actual stack
+		// when the user is not actively searching,
+		// so we only track the size to detect
+		// push/pop underflows and overflows.
+		int mPushStackLevel{};
+
 		Result mResult{};
 		bool mHasSubmitted{};
 	};
