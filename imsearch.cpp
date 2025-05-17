@@ -356,6 +356,7 @@ void ImSearch::AddSynonym(const char* synonym)
 	// you did something wrong.
 	LocalContext& context = GetLocalContext();
 
+	IM_UNUSED(context);
 	IM_ASSERT(context.mPushStackLevel > 0 && "AddSynonym must be called between PushSearchable and PopSearchable. See imsearch_demo.cpp");
 
 	if (!CanCollectSubmissions())
