@@ -217,7 +217,7 @@ void ImSearch::Submit()
 	context.mHasSubmitted = true;
 	context.mInput.mEntries.clear();
 	context.mDisplayCallbacks.clear();
-	IM_ASSERT(context.mPushStack.empty() && "There were more calls to PushSearchable than to PopSearchable");
+	IM_ASSERT(context.mPushStackLevel == 0 && "There were more calls to PushSearchable than to PopSearchable");
 }
 
 void ImSearch::EndSearch()
@@ -241,6 +241,23 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 
 	IM_ASSERT(name != nullptr);
 	IM_ASSERT(!context.mHasSubmitted && "Tried calling PushSearchable after EndSearch or Submit");
+
+	if (!CanCollectSubmissions())
+	{
+		// Invoke the callback immediately if the user
+		// is not actively searching, for performance
+		// and memory reasons.
+		const bool pushResult = Callback::InvokeAsPushSearchable(vTable, functor, name);
+
+		// We only expect a call to PopSearchable if the callback returned true.
+		// So we only increment the depth if the callback returned true.
+		if (pushResult)
+		{
+			context.mPushStackLevel++;
+		}
+
+		return pushResult;
+	}
 
 	context.mInput.mEntries.emplace_back();
 	Searchable& searchable = context.mInput.mEntries.back();
@@ -279,22 +296,33 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 	}
 
 	context.mPushStack.emplace(currentIndex);
+	context.mPushStackLevel++;
 	return true;
 }
 
 void ImSearch::PopSearchable()
 {
-	if (!CanCollectSubmissions())
-	{
-		return;
-	}
-
 	Internal::PopSearchable(nullptr, nullptr);
 }
 
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
 {
 	LocalContext& context = GetLocalContext();
+
+	context.mPushStackLevel--;
+	IM_ASSERT(context.mPushStackLevel >= 0 && "Called PopSearchable too many times!");
+
+	if (!CanCollectSubmissions())
+	{
+		if (functor != nullptr
+			&& vTable != nullptr)
+		{
+			Callback::InvokeAsPopSearchable(vTable, functor);
+		}
+
+		return;
+	}
+
 	const IndexT indexOfCurrentCategory = GetCurrentItem(context);
 
 	if (functor != nullptr
@@ -322,17 +350,19 @@ void ImSearch::SetRelevancyBonus(float bonus)
 
 void ImSearch::AddSynonym(const char* synonym)
 {
-	if (!CanCollectSubmissions())
-	{
-		return;
-	}
-
 	// Ensure there is an active 'parent' item
 	// to add the synonym to; no point in adding
 	// synonyms at the root level, and if you did,
 	// you did something wrong.
 	LocalContext& context = GetLocalContext();
-	(void)GetCurrentItem(context);
+
+	IM_UNUSED(context);
+	IM_ASSERT(context.mPushStackLevel > 0 && "AddSynonym must be called between PushSearchable and PopSearchable. See imsearch_demo.cpp");
+
+	if (!CanCollectSubmissions())
+	{
+		return;
+	}
 
 	if (Internal::PushSearchable(synonym, nullptr, nullptr))
 	{
@@ -610,17 +640,17 @@ ImSearch::Callback::Callback(void* originalFunctor, ImSearch::Internal::VTable v
 
 	int size;
 	vTable(VTableModes::GetSize, &size, nullptr);
-	mData = static_cast<char*>(ImGui::MemAlloc(static_cast<size_t>(size)));
-	IM_ASSERT(mData != nullptr);
-	vTable(VTableModes::MoveConstruct, originalFunctor, mData);
+	mUserFunctor = ImGui::MemAlloc(static_cast<size_t>(size));
+	IM_ASSERT(mUserFunctor != nullptr);
+	vTable(VTableModes::MoveConstruct, originalFunctor, mUserFunctor);
 }
 
 ImSearch::Callback::Callback(Callback&& other) noexcept :
 	mVTable(other.mVTable),
-	mData(other.mData)
+	mUserFunctor(other.mUserFunctor)
 {
 	other.mVTable = nullptr;
-	other.mData = nullptr;
+	other.mUserFunctor = nullptr;
 }
 
 ImSearch::Callback& ImSearch::Callback::operator=(Callback&& other) noexcept
@@ -633,10 +663,10 @@ ImSearch::Callback& ImSearch::Callback::operator=(Callback&& other) noexcept
 	ClearData();
 
 	mVTable = other.mVTable;
-	mData = other.mData;
+	mUserFunctor = other.mUserFunctor;
 
 	other.mVTable = nullptr;
-	other.mData = nullptr;
+	other.mUserFunctor = nullptr;
 
 	return *this;
 }
@@ -648,25 +678,35 @@ ImSearch::Callback::~Callback()
 
 bool ImSearch::Callback::operator()(const char* name) const
 {
-	return mVTable(VTableModes::Invoke, mData, const_cast<char*>(name));
+	return InvokeAsPushSearchable(mVTable, mUserFunctor, name);
 }
 
 void ImSearch::Callback::operator()() const
 {
-	mVTable(VTableModes::Invoke, mData, nullptr);
+	InvokeAsPopSearchable(mVTable, mUserFunctor);
+}
+
+bool ImSearch::Callback::InvokeAsPushSearchable(ImSearch::Internal::VTable vTable, void* userFunctor, const char* name)
+{
+	return vTable(VTableModes::Invoke, userFunctor, const_cast<char*>(name));
+}
+
+void ImSearch::Callback::InvokeAsPopSearchable(ImSearch::Internal::VTable vTable, void* userFunctor)
+{
+	vTable(VTableModes::Invoke, userFunctor, nullptr);
 }
 
 void ImSearch::Callback::ClearData()
 {
-	if (mData == nullptr)
+	if (mUserFunctor == nullptr)
 	{
 		return;
 	}
 
-	mVTable(VTableModes::Destruct, mData, nullptr);
+	mVTable(VTableModes::Destruct, mUserFunctor, nullptr);
 
-	ImGui::MemFree(mData);
-	mData = nullptr;
+	ImGui::MemFree(mUserFunctor);
+	mUserFunctor = nullptr;
 }
 
 bool ImSearch::operator==(const StrView& lhs, const StrView& rhs)
