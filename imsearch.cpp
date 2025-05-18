@@ -19,7 +19,7 @@ namespace ImSearch
 	
 	static void FindStringToAppendOnAutoComplete(const Input& input, Output& output);
 
-	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
+	static void DisplayToUser(ImSearch::LocalContext& context, const ImSearch::Result& result);
 
 	static ImSearch::ImSearchContext* sContext{};
 }
@@ -576,7 +576,7 @@ void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& outp
 	}
 }
 
-void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
+void ImSearch::DisplayToUser(LocalContext& context, const Result& result)
 {
 	const std::string& userQuery = result.mInput.mUserQuery;
 	const bool isUserSearching = !userQuery.empty();
@@ -585,19 +585,26 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
 
 	ImDrawList* windowDrawList = ImGui::GetWindowDrawList();
+
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
-	
-	IM_UNUSED(windowDrawList);
-
 	queryDrawList.AddDrawCmd();
 	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
 	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
-	queryDrawList.AddText(
-		{},
-		0xffffffff,
-		userQuery.c_str(),
-		userQuery.c_str() + userQuery.size());
+
+	std::vector<IndexT>& characterStarts = context.mResult.mBuffers.mTempIndices;
+	characterStarts.clear();
+
+	for (size_t i = 0; i < userQuery.size(); i++)
+	{
+		characterStarts.push_back(static_cast<IndexT>(queryDrawList.VtxBuffer.size()));
+		queryDrawList.AddText(
+			{},
+			0xffffffff,
+			userQuery.c_str() + i,
+			userQuery.c_str() + i + 1);
+	}
+
 	queryDrawList.PopClipRect();
 	queryDrawList.PopTextureID();
 
@@ -643,32 +650,50 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		IM_ASSERT(it != displayOrder.end());
 	}
 
-	for (int matchStart = drawListStart; matchStart < windowDrawList->VtxBuffer.size() - 1 - queryDrawList.VtxBuffer.size(); matchStart++)
+	for (int matchStart = drawListStart; matchStart < windowDrawList->VtxBuffer.size() - queryDrawList.VtxBuffer.size(); matchStart++)
 	{
-		int matchEnd = matchStart + 1;
+		int matchEnd = matchStart;
 
-		for (int j = 0; j < queryDrawList.VtxBuffer.size() - 1; j++, matchEnd++)
+		for (int drawnCharIdx = 0; drawnCharIdx < static_cast<int>(characterStarts.size()); drawnCharIdx++)
 		{
-			const ImDrawVert expectedCurr = queryDrawList.VtxBuffer[j];
-			const ImDrawVert expectedNext = queryDrawList.VtxBuffer[j + 1];
+			const int charStart = static_cast<int>(characterStarts[static_cast<size_t>(drawnCharIdx)]);
+			const int charEnd = drawnCharIdx + 1 == static_cast<int>(characterStarts.size()) ? 
+				queryDrawList.VtxBuffer.size() :
+				static_cast<int>(characterStarts[static_cast<size_t>(drawnCharIdx + 1)]);
 
-			const ImDrawVert actualCurr = windowDrawList->VtxBuffer[matchStart + j];
-			const ImDrawVert actualNext = windowDrawList->VtxBuffer[matchStart + j + 1];
+			bool breakOuter{};
 
-			const ImVec2 expectedDelta = { expectedNext.pos.x - expectedCurr.pos.x, expectedNext.pos.y - expectedCurr.pos.y };
-			const ImVec2 actualDelta = { actualNext.pos.x - actualCurr.pos.x, actualNext.pos.y - actualCurr.pos.y };
+			for (int vtxIdx = charStart; vtxIdx < charEnd; vtxIdx++, matchEnd++)
+			{
+				const ImVec2 expectedCurr = queryDrawList.VtxBuffer[vtxIdx].uv;
+				const ImVec2 actualCurr = windowDrawList->VtxBuffer[matchStart + vtxIdx].uv;
 
-			// use std::not_equal_to instead of != to silence -Wfloat-equal
-			// warnings, for those that want to integrate this library
-			// with a stricter codebase.
-			if (std::not_equal_to<float>{}(expectedDelta.x, actualDelta.x)
-				|| std::not_equal_to<float>{}(expectedDelta.y, actualDelta.y))
+				// use std::not_equal_to instead of != to silence -Wfloat-equal
+				// warnings, for those that want to integrate this library
+				// with a stricter codebase.
+				if (std::not_equal_to<float>{}(expectedCurr.x, actualCurr.x)
+					|| std::not_equal_to<float>{}(expectedCurr.y, actualCurr.y))
+				{
+					breakOuter = true;
+					
+					if (vtxIdx == charStart)
+					{
+						break;
+					}
+
+					matchEnd = -1;
+					break;
+				}
+			}
+
+			if (breakOuter)
 			{
 				break;
 			}
+
 		}
 
-		if (matchEnd - matchStart > 1)
+		if (matchEnd - matchStart == queryDrawList.VtxBuffer.size())
 		{
 			for (int i = matchStart; i < matchEnd; i++)
 			{
