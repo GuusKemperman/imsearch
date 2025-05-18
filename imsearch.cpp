@@ -588,8 +588,7 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
 
-	ImDrawList* windowDrawList = ImGui::GetWindowDrawList();
-	const int drawListStart = windowDrawList->VtxBuffer.size();
+	BeginHighlightZone(userQuery.c_str());
 
 	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
 	{
@@ -631,10 +630,7 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		IM_ASSERT(it != displayOrder.end());
 	}
 
-	HighlightSubstrings(userQuery.c_str(),
-		userQuery.c_str() + userQuery.size(),
-		windowDrawList->VtxBuffer.Data + drawListStart,
-		windowDrawList->VtxBuffer.Data + windowDrawList->VtxBuffer.size());
+	EndHighlightZone();
 
 	ImGui::PopID();
 }
@@ -845,7 +841,46 @@ const char* ImSearch::GetPreviewText()
 	return GetLocalContext().mResult.mOutput.mPreviewText.c_str();
 }
 
-void ImSearch::HighlightSubstrings(const char* substrStart, const char* substrEnd, ImDrawVert* vertStart, ImDrawVert* vertEnd)
+void ImSearch::BeginHighlightZone(const char* textToHighlight)
+{
+	ImGuiStorage* storage = ImGui::GetStateStorage();	
+
+	std::string* str = new std::string(textToHighlight);
+	storage->SetVoidPtr(ImGui::GetID("TextToHighlight"), str);
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	storage->SetInt(ImGui::GetID("StartVertIdx"), drawList->VtxBuffer.size());
+
+	drawList->ChannelsSplit(2);
+	drawList->ChannelsSetCurrent(1);
+}
+
+void ImSearch::EndHighlightZone()
+{
+	ImGuiStorage* storage = ImGui::GetStateStorage();
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+	std::string* str = static_cast<std::string*>(storage->GetVoidPtr(ImGui::GetID("TextToHighlight")));
+	const int prevVertexEnd = storage->GetInt(ImGui::GetID("StartVertIdx"));
+
+	drawList->ChannelsSetCurrent(0);
+
+	HighlightSubstrings(str->c_str(),
+		str->c_str() + str->size(),
+		drawList,
+		prevVertexEnd,
+		drawList->VtxBuffer.size());
+
+	drawList->ChannelsMerge();
+
+	delete str;
+}
+
+void ImSearch::HighlightSubstrings(const char* substrStart, 
+	const char* substrEnd, 
+	ImDrawList* drawList, 
+	int startVertIdx,
+	int endVertIdx)
 {
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
@@ -882,9 +917,9 @@ void ImSearch::HighlightSubstrings(const char* substrStart, const char* substrEn
 	queryDrawList.PopClipRect();
 	queryDrawList.PopTextureID();
 
-	for (ImDrawVert* matchStart = vertStart; matchStart < vertEnd; matchStart++)
+	for (int matchStart = startVertIdx; matchStart < endVertIdx; matchStart++)
 	{
-		ImDrawVert* matchEnd = matchStart;
+		int matchEnd = matchStart;
 
 		for (int chIdx = 0; chIdx < substrEnd - substrStart; chIdx++)
 		{
@@ -895,11 +930,11 @@ void ImSearch::HighlightSubstrings(const char* substrStart, const char* substrEn
 				const DrawnGlyph& glyph = glyphs[(chIdx * 2) + i];
 				const int glyphLength = glyph.mVtxIdxEnd - glyph.mVtxIdxStart;
 
-				ImDrawVert* nextMatchEnd = matchEnd + glyphLength;
+				const int nextMatchEnd = matchEnd + glyphLength;
 
-				if (nextMatchEnd <= vertEnd
+				if (nextMatchEnd <= endVertIdx
 					&& DoDrawnGlyphsMatch(queryDrawList.VtxBuffer.Data + glyph.mVtxIdxStart,
-					matchEnd,
+					&drawList->VtxBuffer[matchEnd],
 					glyphLength))
 				{
 					matchEnd = nextMatchEnd;
@@ -915,10 +950,27 @@ void ImSearch::HighlightSubstrings(const char* substrStart, const char* substrEn
 			}
 		}
 
-		for (ImDrawVert* vtx = matchStart; vtx < matchEnd; vtx++)
+		if (matchStart == matchEnd)
 		{
-			vtx->col = ImGui::ColorConvertFloat4ToU32({ 1.0f, .5f, 0.0f, 1.0f });
+			continue;
+		}
+
+		ImVec2 min{ INFINITY, INFINITY };
+		ImVec2 max{ -INFINITY, -INFINITY };
+		
+		for (int vtxIdx = matchStart; vtxIdx < matchEnd; vtxIdx++)
+		{
+			ImDrawVert& vert = drawList->VtxBuffer[vtxIdx];
+			vert.col = ImGui::ColorConvertFloat4ToU32({ 1.0f, .5f, 0.0f, 1.0f });
+
+			min.x = std::min(min.x, vert.pos.x);
+			min.y = std::min(min.y, vert.pos.y);
+
+			max.x = std::max(max.x, vert.pos.x);
+			max.y = std::max(max.y, vert.pos.y);
 		}		
+
+		drawList->AddRectFilled(min, max, 0xffffffff);
 	}
 }
 
