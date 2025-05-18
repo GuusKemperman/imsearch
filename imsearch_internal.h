@@ -219,8 +219,8 @@ namespace ImSearch
 	void HighlightSubstrings(const char* substrStart,
 		const char* substrEnd,
 		ImDrawList* drawList,
-		int startVertIdx,
-		int endVertIdx);
+		int startIdxIdx,
+		int endIdxIdx);
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions

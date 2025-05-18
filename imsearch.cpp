@@ -21,8 +21,11 @@ namespace ImSearch
 
 	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
 
-	static bool DoDrawnGlyphsMatch(const ImDrawVert* lhsStart, 
-		const ImDrawVert* rhsStart,
+	static bool DoDrawnGlyphsMatch(
+		const ImDrawList& lhsList,
+		const ImDrawIdx* lhsStart,
+		const ImDrawList& rhsList,
+		const ImDrawIdx* rhsStart,
 		int length);
 
 	static ImSearch::ImSearchContext* sContext{};
@@ -635,12 +638,16 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 	ImGui::PopID();
 }
 
-bool ImSearch::DoDrawnGlyphsMatch(const ImDrawVert* lhsStart, const ImDrawVert* rhsStart, int length)
+bool ImSearch::DoDrawnGlyphsMatch(const ImDrawList& lhsList,
+	const ImDrawIdx* lhsStart,
+	const ImDrawList& rhsList,
+	const ImDrawIdx* rhsStart,
+	int length)
 {
 	for (int i = 0; i < length; i++)
 	{
-		const ImVec2 expectedCurr = lhsStart[i].uv;
-		const ImVec2 actualCurr = rhsStart[i].uv;
+		const ImVec2 expectedCurr = lhsList.VtxBuffer[lhsStart[i]].uv;
+		const ImVec2 actualCurr = rhsList.VtxBuffer[rhsStart[i]].uv;
 
 		// use std::not_equal_to instead of != to silence -Wfloat-equal
 		// warnings, for those that want to integrate this library
@@ -849,10 +856,7 @@ void ImSearch::BeginHighlightZone(const char* textToHighlight)
 	storage->SetVoidPtr(ImGui::GetID("TextToHighlight"), str);
 
 	ImDrawList* drawList = ImGui::GetWindowDrawList();
-	storage->SetInt(ImGui::GetID("StartVertIdx"), drawList->VtxBuffer.size());
-
-	drawList->ChannelsSplit(2);
-	drawList->ChannelsSetCurrent(1);
+	storage->SetInt(ImGui::GetID("StartIdxIdx"), drawList->IdxBuffer.size());
 }
 
 void ImSearch::EndHighlightZone()
@@ -861,17 +865,13 @@ void ImSearch::EndHighlightZone()
 	ImDrawList* drawList = ImGui::GetWindowDrawList();
 
 	std::string* str = static_cast<std::string*>(storage->GetVoidPtr(ImGui::GetID("TextToHighlight")));
-	const int prevVertexEnd = storage->GetInt(ImGui::GetID("StartVertIdx"));
-
-	drawList->ChannelsSetCurrent(0);
+	const int prevIdxEnd = storage->GetInt(ImGui::GetID("StartIdxIdx"));
 
 	HighlightSubstrings(str->c_str(),
 		str->c_str() + str->size(),
 		drawList,
-		prevVertexEnd,
-		drawList->VtxBuffer.size());
-
-	drawList->ChannelsMerge();
+		prevIdxEnd,
+		drawList->IdxBuffer.size());
 
 	delete str;
 }
@@ -879,8 +879,8 @@ void ImSearch::EndHighlightZone()
 void ImSearch::HighlightSubstrings(const char* substrStart, 
 	const char* substrEnd, 
 	ImDrawList* drawList, 
-	int startVertIdx,
-	int endVertIdx)
+	int startIdxIdx,
+	int endIdxIdx)
 {
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
@@ -892,16 +892,16 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 	{
 		DrawnGlyph(ImDrawList& l, char character)
 		{
-			mVtxIdxStart = l.VtxBuffer.size();
+			mIdxIdxStart = l.IdxBuffer.size();
 			l.AddText(
 				{},
 				0xffffffff,
 				&character,
 				&character + 1);
-			mVtxIdxEnd = l.VtxBuffer.size();
+			mIdxIdxEnd = l.IdxBuffer.size();
 		}
-		int mVtxIdxStart{};
-		int mVtxIdxEnd{};
+		int mIdxIdxStart{};
+		int mIdxIdxEnd{};
 	};
 	ImVector<DrawnGlyph> glyphs{};
 
@@ -917,7 +917,7 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 	queryDrawList.PopClipRect();
 	queryDrawList.PopTextureID();
 
-	for (int matchStart = startVertIdx; matchStart < endVertIdx; matchStart++)
+	for (int matchStart = startIdxIdx; matchStart < endIdxIdx; matchStart++)
 	{
 		int matchEnd = matchStart;
 
@@ -928,14 +928,17 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 			for (int i = 0; i < 2; i++)
 			{
 				const DrawnGlyph& glyph = glyphs[(chIdx * 2) + i];
-				const int glyphLength = glyph.mVtxIdxEnd - glyph.mVtxIdxStart;
+				const int glyphLength = glyph.mIdxIdxEnd - glyph.mIdxIdxStart;
 
 				const int nextMatchEnd = matchEnd + glyphLength;
 
-				if (nextMatchEnd <= endVertIdx
-					&& DoDrawnGlyphsMatch(queryDrawList.VtxBuffer.Data + glyph.mVtxIdxStart,
-					&drawList->VtxBuffer[matchEnd],
-					glyphLength))
+				if (nextMatchEnd <= endIdxIdx
+					&& DoDrawnGlyphsMatch(
+						queryDrawList,
+						queryDrawList.IdxBuffer.Data + glyph.mIdxIdxStart,
+						*drawList,
+						&drawList->IdxBuffer[matchEnd],
+						glyphLength))
 				{
 					matchEnd = nextMatchEnd;
 					anyGlyphMatching = true;
@@ -958,10 +961,10 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 		ImVec2 min{ INFINITY, INFINITY };
 		ImVec2 max{ -INFINITY, -INFINITY };
 		
-		for (int vtxIdx = matchStart; vtxIdx < matchEnd; vtxIdx++)
+		for (int idxIdx = matchStart; idxIdx < matchEnd; idxIdx++)
 		{
-			ImDrawVert& vert = drawList->VtxBuffer[vtxIdx];
-			vert.col = ImGui::ColorConvertFloat4ToU32({ 1.0f, .5f, 0.0f, 1.0f });
+			ImDrawVert& vert = drawList->VtxBuffer[drawList->IdxBuffer[idxIdx]];
+			vert.col = 0xFF000000;
 
 			min.x = std::min(min.x, vert.pos.x);
 			min.y = std::min(min.y, vert.pos.y);
@@ -970,7 +973,21 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 			max.y = std::max(max.y, vert.pos.y);
 		}		
 
-		drawList->AddRectFilled(min, max, 0xffffffff);
+		const ImVec2 padding = ImGui::GetStyle().FramePadding;
+		min.x -= padding.x * .5f;
+		min.y -= padding.y * .5f;
+		max.x += padding.x * .5f;
+		max.y += padding.y * .5f;
+
+		drawList->AddRectFilled(min, max, 0xFF4AC28B);
+
+		const int count = matchEnd - matchStart;
+		drawList->PrimReserve(count, 0);
+
+		for (int idxIdx = matchStart; idxIdx < matchEnd; idxIdx++)
+		{
+			drawList->PrimWriteIdx(drawList->IdxBuffer[idxIdx]);
+		}
 	}
 }
 
