@@ -212,6 +212,11 @@ namespace ImSearch
 
 	const char* GetPreviewText();
 
+	void HighlightSubstrings(const char* substrStart,
+		const char* substrEnd,
+		ImDrawVert* vertStart,
+		ImDrawVert* vertEnd);
+
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions
 	//-----------------------------------------------------------------------------

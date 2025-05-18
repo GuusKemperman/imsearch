@@ -21,6 +21,10 @@ namespace ImSearch
 
 	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
 
+	static bool DoDrawnGlyphsMatch(const ImDrawVert* lhsStart, 
+		const ImDrawVert* rhsStart,
+		int length);
+
 	static ImSearch::ImSearchContext* sContext{};
 }
 
@@ -585,22 +589,6 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
 
 	ImDrawList* windowDrawList = ImGui::GetWindowDrawList();
-
-	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
-	ImDrawList queryDrawList{ sharedData };
-	queryDrawList.AddDrawCmd();
-	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
-	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
-
-	queryDrawList.AddText(
-		{},
-		0xffffffff,
-		userQuery.c_str(),
-		userQuery.c_str() + userQuery.size());
-
-	queryDrawList.PopClipRect();
-	queryDrawList.PopTextureID();
-
 	const int drawListStart = windowDrawList->VtxBuffer.size();
 
 	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
@@ -643,35 +631,32 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		IM_ASSERT(it != displayOrder.end());
 	}
 
-	for (int matchStart = drawListStart; matchStart < windowDrawList->VtxBuffer.size() - queryDrawList.VtxBuffer.size(); matchStart++)
+	HighlightSubstrings(userQuery.c_str(),
+		userQuery.c_str() + userQuery.size(),
+		windowDrawList->VtxBuffer.Data + drawListStart,
+		windowDrawList->VtxBuffer.Data + windowDrawList->VtxBuffer.size());
+
+	ImGui::PopID();
+}
+
+bool ImSearch::DoDrawnGlyphsMatch(const ImDrawVert* lhsStart, const ImDrawVert* rhsStart, int length)
+{
+	for (int i = 0; i < length; i++)
 	{
-		int matchEnd = matchStart;
+		const ImVec2 expectedCurr = lhsStart[i].uv;
+		const ImVec2 actualCurr = rhsStart[i].uv;
 
-		for (int vtxIdx = 0; vtxIdx < queryDrawList.VtxBuffer.size(); vtxIdx++, matchEnd++)
+		// use std::not_equal_to instead of != to silence -Wfloat-equal
+		// warnings, for those that want to integrate this library
+		// with a stricter codebase.
+		if (std::not_equal_to<float>{}(expectedCurr.x, actualCurr.x)
+			|| std::not_equal_to<float>{}(expectedCurr.y, actualCurr.y))
 		{
-			const ImVec2 expectedCurr = queryDrawList.VtxBuffer[vtxIdx].uv;
-			const ImVec2 actualCurr = windowDrawList->VtxBuffer[matchStart + vtxIdx].uv;
-
-			// use std::not_equal_to instead of != to silence -Wfloat-equal
-			// warnings, for those that want to integrate this library
-			// with a stricter codebase.
-			if (std::not_equal_to<float>{}(expectedCurr.x, actualCurr.x)
-				|| std::not_equal_to<float>{}(expectedCurr.y, actualCurr.y))
-			{
-				break;
-			}
-		}
-
-		if (matchEnd - matchStart == queryDrawList.VtxBuffer.size())
-		{
-			for (int i = matchStart; i < matchEnd; i++)
-			{
-				windowDrawList->VtxBuffer[i].col = 0xFFA500FF;
-			}
+			return false;
 		}
 	}
 
-	ImGui::PopID();
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -858,6 +843,83 @@ void ImSearch::SetPreviewText(const char* preview)
 const char* ImSearch::GetPreviewText()
 {
 	return GetLocalContext().mResult.mOutput.mPreviewText.c_str();
+}
+
+void ImSearch::HighlightSubstrings(const char* substrStart, const char* substrEnd, ImDrawVert* vertStart, ImDrawVert* vertEnd)
+{
+	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
+	ImDrawList queryDrawList{ sharedData };
+	queryDrawList.AddDrawCmd();
+	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
+	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
+
+	struct DrawnGlyph
+	{
+		DrawnGlyph(ImDrawList& l, char character)
+		{
+			mVtxIdxStart = l.VtxBuffer.size();
+			l.AddText(
+				{},
+				0xffffffff,
+				&character,
+				&character + 1);
+			mVtxIdxEnd = l.VtxBuffer.size();
+		}
+		int mVtxIdxStart{};
+		int mVtxIdxEnd{};
+	};
+	ImVector<DrawnGlyph> glyphs{};
+
+	for (const char* ch = substrStart; ch < substrEnd; ch++)
+	{
+		const char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(*ch)));
+		const char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(*ch)));
+
+		glyphs.push_back(DrawnGlyph{ queryDrawList, lower });
+		glyphs.push_back(DrawnGlyph{ queryDrawList, upper });
+	}
+
+	queryDrawList.PopClipRect();
+	queryDrawList.PopTextureID();
+
+	for (ImDrawVert* matchStart = vertStart; matchStart < vertEnd; matchStart++)
+	{
+		ImDrawVert* matchEnd = matchStart;
+
+		for (int chIdx = 0; chIdx < substrEnd - substrStart; chIdx++)
+		{
+			bool anyGlyphMatching = false;
+
+			for (int i = 0; i < 2; i++)
+			{
+				const DrawnGlyph& glyph = glyphs[(chIdx * 2) + i];
+				const int glyphLength = glyph.mVtxIdxEnd - glyph.mVtxIdxStart;
+
+				ImDrawVert* nextMatchEnd = matchEnd + glyphLength;
+
+				if (nextMatchEnd <= vertEnd
+					&& DoDrawnGlyphsMatch(queryDrawList.VtxBuffer.Data + glyph.mVtxIdxStart,
+					matchEnd,
+					glyphLength))
+				{
+					matchEnd = nextMatchEnd;
+					anyGlyphMatching = true;
+					break;
+				}
+			}
+
+			if (!anyGlyphMatching)
+			{
+				matchEnd = matchStart;
+				break;
+			}
+		}
+
+		for (ImDrawVert* vtx = matchStart; vtx < matchEnd; vtx++)
+		{
+			vtx->col = ImGui::ColorConvertFloat4ToU32({ 1.0f, .5f, 0.0f, 1.0f });
+		}		
+	}
 }
 
 std::vector<std::string> ImSearch::SplitTokens(StrView s)
