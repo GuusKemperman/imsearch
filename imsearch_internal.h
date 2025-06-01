@@ -174,6 +174,10 @@ namespace ImSearch
 		std::unordered_map<ImGuiID, LocalContext> Contexts{};
 		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
 		std::unordered_map<std::string, std::string> mTokenisedStrings{};
+
+		// Style and Colormaps
+		ImSearchStyle                 Style;
+		ImVector<ImGuiColorMod>     ColorModifiers;
 	};
 
 	bool operator==(const StrView& lhs, const StrView& rhs);
@@ -216,11 +220,11 @@ namespace ImSearch
 
 	void EndHighlightZone();
 
-	void HighlightSubstrings(const char* substrStart,
-		const char* substrEnd,
-		ImDrawList* drawList,
-		int startIdxIdx,
-		int endIdxIdx);
+	//-----------------------------------------------------------------------------
+	// [SECTION] Styling
+	//-----------------------------------------------------------------------------
+
+
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions

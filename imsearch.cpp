@@ -28,12 +28,24 @@ namespace ImSearch
 		const ImDrawIdx* rhsStart,
 		int length);
 
+	static void HighlightSubstrings(const char* substrStart,
+		const char* substrEnd,
+		ImDrawList* drawList,
+		int startIdxIdx,
+		int endIdxIdx);
+
 	static ImSearch::ImSearchContext* sContext{};
 }
 
 //-----------------------------------------------------------------------------
 // [SECTION] Definitions from imsearch.h
 //-----------------------------------------------------------------------------
+
+ImSearchStyle::ImSearchStyle()
+{
+	Colors[ImSearchCol_HighlightText] = ImGui::ColorConvertU32ToFloat4(0xFF000000);
+	Colors[ImSearchCol_HighlightTextBg] = ImGui::ColorConvertU32ToFloat4(0xFF4AC28B);
+}
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
 {
@@ -387,6 +399,56 @@ const char* ImSearch::GetUserQuery()
 {
 	LocalContext& context = GetLocalContext();
 	return context.mInput.mUserQuery.c_str();
+}
+
+
+ImSearchStyle& ImSearch::GetStyle() 
+{
+	ImSearchContext& context = GetImSearchContext();
+	return context.Style;
+}
+
+ImU32 ImSearch::GetColorU32(ImSearchCol idx, float alpha_mul)
+{
+	ImSearchStyle& style = GetStyle();
+	ImVec4 c = GetStyleColorVec4(idx);
+	c.w *= ImGui::GetStyle().Alpha * alpha_mul;
+	return ImGui::ColorConvertFloat4ToU32(c);
+}
+
+const ImVec4& ImSearch::GetStyleColorVec4(ImSearchCol idx)
+{
+	ImSearchStyle& style = GetStyle();
+	return style.Colors[idx];
+}
+
+void ImSearch::PushStyleColor(ImSearchCol idx, ImU32 col)
+{
+	PushStyleColor(idx, ImGui::ColorConvertU32ToFloat4(col));
+}
+
+void ImSearch::PushStyleColor(ImSearchCol idx, const ImVec4& col) 
+{
+	ImSearchContext& context = GetImSearchContext();
+
+	ImGuiColorMod backup;
+	backup.Col = (ImGuiCol)idx;
+	backup.BackupValue = context.Style.Colors[idx];
+	context.ColorModifiers.push_back(backup);
+	context.Style.Colors[idx] = col;
+}
+
+void ImSearch::PopStyleColor(int count) 
+{
+	ImSearchContext& context = GetImSearchContext();
+	IM_ASSERT_USER_ERROR(count <= context.ColorModifiers.size(), "You can't pop more modifiers than have been pushed!");
+	while (count > 0)
+	{
+		ImGuiColorMod& backup = context.ColorModifiers.back();
+		context.Style.Colors[backup.Col] = backup.BackupValue;
+		context.ColorModifiers.pop_back();
+		count--;
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -882,6 +944,9 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 	int startIdxIdx,
 	int endIdxIdx)
 {
+	const ImU32 textCol = ImSearch::GetColorU32(ImSearchCol_HighlightText);
+	const ImU32 textBgCol = ImSearch::GetColorU32(ImSearchCol_HighlightTextBg);
+
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
 	queryDrawList.AddDrawCmd();
@@ -964,7 +1029,7 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 		for (int idxIdx = matchStart; idxIdx < matchEnd; idxIdx++)
 		{
 			ImDrawVert& vert = drawList->VtxBuffer[drawList->IdxBuffer[idxIdx]];
-			vert.col = 0xFF000000;
+			vert.col = textCol;
 
 			min.x = std::min(min.x, vert.pos.x);
 			min.y = std::min(min.y, vert.pos.y);
@@ -979,7 +1044,7 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 		max.x += padding.x * .5f;
 		max.y += padding.y * .5f;
 
-		drawList->AddRectFilled(min, max, 0xFF4AC28B);
+		drawList->AddRectFilled(min, max, textBgCol);
 
 		const int count = matchEnd - matchStart;
 		drawList->PrimReserve(count, 0);
@@ -1254,3 +1319,5 @@ float ImSearch::WeightedRatio(StrView s1,
 }
 
 #endif // #ifndef IMGUI_DISABLE
+
+

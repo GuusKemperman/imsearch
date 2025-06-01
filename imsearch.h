@@ -1,6 +1,28 @@
 #pragma once
-
+#include "imgui.h"
 #ifndef IMGUI_DISABLE
+
+typedef int ImSearchCol;                // -> enum ImSearchCol_
+
+typedef int ImSearchColormap;           // -> enum ImSearchColormap_
+
+// Plot styling colors.
+enum ImSearchCol_
+{
+	// item styling colors
+	ImSearchCol_HighlightText, // TODO Documentation
+	ImSearchCol_HighlightTextBg,
+	ImSearchCol_COUNT
+};
+
+// Plot style structure
+struct ImSearchStyle
+{
+	// style colors
+	ImVec4  Colors[ImSearchCol_COUNT]; // Array of styling colors. Indexable with ImSearchCol_ enums.
+
+	ImSearchStyle();
+};
 
 namespace ImSearch
 {
@@ -198,6 +220,31 @@ namespace ImSearch
 	// Will return the text that the user has typed
 	// and is currently searching for.
 	const char* GetUserQuery();
+
+	//-----------------------------------------------------------------------------
+	// [SECTION] Styling
+	//-----------------------------------------------------------------------------
+
+	// Like ImGui, all style colors are stored in indexable array in ImSearchStyle. 
+	// You can permanently modify these values through GetStyle().Colors, or 
+	// temporarily modify them with Push/Pop functions below.
+
+	// Provides access to plot style structure for permanant modifications to colors, sizes, etc.
+	ImSearchStyle& GetStyle();
+
+	ImU32 GetColorU32(ImSearchCol idx, float alpha_mul = 1.0f);
+	const ImVec4& GetStyleColorVec4(ImSearchCol idx);
+
+	// Use PushStyleX to temporarily modify your ImSearchStyle. The modification
+	// will last until the matching call to PopStyleX. You MUST call a pop for
+	// every push, otherwise you will leak memory! This behaves just like ImGui.
+
+	// Temporarily modify a style color. Don't forget to call PopStyleColor!
+	void PushStyleColor(ImSearchCol idx, ImU32 col);
+	void PushStyleColor(ImSearchCol idx, const ImVec4& col);
+
+	// Undo temporary style color modification(s). Undo multiple pushes at once by increasing count.
+	void PopStyleColor(int count = 1);
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Demo
