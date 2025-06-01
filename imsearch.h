@@ -1,6 +1,33 @@
 #pragma once
-
+#include "imgui.h"
 #ifndef IMGUI_DISABLE
+
+typedef int ImSearchCol;                // -> enum ImSearchCol_
+typedef int ImSearchFlags;				// -> enum ImSearchFlags_     // Flags: for BeginSearch()
+
+enum ImSearchFlags_
+{
+	ImSearchFlags_None = 0,
+	ImSearchFlags_NoTextHighlighting = 1 << 0
+};
+
+// Plot styling colors.
+enum ImSearchCol_
+{
+	// item styling colors
+	ImSearchCol_TextHighlighted, // All matching substrings are highlighted by default, and will be this colour
+	ImSearchCol_TextHighlightedBg, // Background colour of all highlighted text
+	ImSearchCol_COUNT
+};
+
+// Plot style structure
+struct ImSearchStyle
+{
+	// style colors
+	ImVec4  Colors[ImSearchCol_COUNT]; // Array of styling colors. Indexable with ImSearchCol_ enums.
+
+	ImSearchStyle();
+};
 
 namespace ImSearch
 {
@@ -51,7 +78,7 @@ namespace ImSearch
 	// - BeginSearch must be unique to the current ImGui ID scope, having multiple
 	//   calls to BeginSearch leads to ID collisions. If you need to avoid ID
 	//   collisions, use ImGui::PushId
-	bool BeginSearch();
+	bool BeginSearch(ImSearchFlags flags = 0);
 
 	// Only call EndSearch() if BeginSearch() returns true! Typically called at the end
 	// of an if statement conditioned on BeginSearch(). See example above.
@@ -198,6 +225,30 @@ namespace ImSearch
 	// Will return the text that the user has typed
 	// and is currently searching for.
 	const char* GetUserQuery();
+
+	//-----------------------------------------------------------------------------
+	// [SECTION] Styling
+	//-----------------------------------------------------------------------------
+
+	// Like ImGui, all style colors are stored in indexable array in ImSearchStyle. 
+	// You can permanently modify these values through GetStyle().Colors, or 
+	// temporarily modify them with Push/Pop functions below.
+
+	ImSearchStyle& GetStyle();
+
+	ImU32 GetColorU32(ImSearchCol idx, float alpha_mul = 1.0f);
+	const ImVec4& GetStyleColorVec4(ImSearchCol idx);
+
+	// Use PushStyleX to temporarily modify your ImSearchStyle. The modification
+	// will last until the matching call to PopStyleX. You MUST call a pop for
+	// every push, otherwise you will leak memory! This behaves just like ImGui.
+
+	// Temporarily modify a style color. Don't forget to call PopStyleColor!
+	void PushStyleColor(ImSearchCol idx, ImU32 col);
+	void PushStyleColor(ImSearchCol idx, const ImVec4& col);
+
+	// Undo temporary style color modification(s). Undo multiple pushes at once by increasing count.
+	void PopStyleColor(int count = 1);
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Demo

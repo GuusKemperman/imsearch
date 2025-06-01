@@ -21,12 +21,31 @@ namespace ImSearch
 
 	static void DisplayToUser(const ImSearch::LocalContext& context, const ImSearch::Result& result);
 
+	static bool DoDrawnGlyphsMatch(
+		const ImDrawList& lhsList,
+		const ImDrawIdx* lhsStart,
+		const ImDrawList& rhsList,
+		const ImDrawIdx* rhsStart,
+		int length);
+
+	static void HighlightSubstrings(const char* substrStart,
+		const char* substrEnd,
+		ImDrawList* drawList,
+		int startIdxIdx,
+		int endIdxIdx);
+
 	static ImSearch::ImSearchContext* sContext{};
 }
 
 //-----------------------------------------------------------------------------
 // [SECTION] Definitions from imsearch.h
 //-----------------------------------------------------------------------------
+
+ImSearchStyle::ImSearchStyle()
+{
+	Colors[ImSearchCol_TextHighlighted] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	Colors[ImSearchCol_TextHighlightedBg] = { 1.0f, 1.0f, 0.0f, 1.0f };
+}
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
 {
@@ -62,7 +81,7 @@ void ImSearch::SetCurrentContext(ImSearchContext* ctx)
 	sContext = ctx;
 }
 
-bool ImSearch::BeginSearch()
+bool ImSearch::BeginSearch(ImSearchFlags flags)
 {
 	const ImGuiID imId = ImGui::GetID("Search");
 	ImGui::PushID(static_cast<int>(imId));
@@ -72,6 +91,7 @@ bool ImSearch::BeginSearch()
 	context.ContextStack.emplace(localContext);
 
 	localContext.mHasSubmitted = false;
+	localContext.mInput.mFlags = flags;
 
 	return true;
 }
@@ -382,6 +402,55 @@ const char* ImSearch::GetUserQuery()
 	return context.mInput.mUserQuery.c_str();
 }
 
+
+ImSearchStyle& ImSearch::GetStyle() 
+{
+	ImSearchContext& context = GetImSearchContext();
+	return context.Style;
+}
+
+ImU32 ImSearch::GetColorU32(ImSearchCol idx, float alpha_mul)
+{
+	ImVec4 c = GetStyleColorVec4(idx);
+	c.w *= ImGui::GetStyle().Alpha * alpha_mul;
+	return ImGui::ColorConvertFloat4ToU32(c);
+}
+
+const ImVec4& ImSearch::GetStyleColorVec4(ImSearchCol idx)
+{
+	ImSearchStyle& style = GetStyle();
+	return style.Colors[idx];
+}
+
+void ImSearch::PushStyleColor(ImSearchCol idx, ImU32 col)
+{
+	PushStyleColor(idx, ImGui::ColorConvertU32ToFloat4(col));
+}
+
+void ImSearch::PushStyleColor(ImSearchCol idx, const ImVec4& col) 
+{
+	ImSearchContext& context = GetImSearchContext();
+
+	ImGuiColorMod backup;
+	backup.Col = static_cast<ImGuiCol>(idx);
+	backup.BackupValue = context.Style.Colors[idx];
+	context.ColorModifiers.push_back(backup);
+	context.Style.Colors[idx] = col;
+}
+
+void ImSearch::PopStyleColor(int count) 
+{
+	ImSearchContext& context = GetImSearchContext();
+	IM_ASSERT_USER_ERROR(count <= context.ColorModifiers.size(), "You can't pop more modifiers than have been pushed!");
+	while (count > 0)
+	{
+		ImGuiColorMod& backup = context.ColorModifiers.back();
+		context.Style.Colors[backup.Col] = backup.BackupValue;
+		context.ColorModifiers.pop_back();
+		count--;
+	}
+}
+
 //-----------------------------------------------------------------------------
 // [SECTION] Definitions from static functions
 //-----------------------------------------------------------------------------
@@ -578,10 +647,17 @@ void ImSearch::FindStringToAppendOnAutoComplete(const Input& input, Output& outp
 
 void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 {
-	const bool isUserSearching = !result.mInput.mUserQuery.empty();
+	const std::string& userQuery = result.mInput.mUserQuery;
+	const bool isUserSearching = !userQuery.empty();
 	ImGui::PushID(isUserSearching);
 
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
+
+	const bool hasHighlighting = (context.mInput.mFlags & ImSearchFlags_NoTextHighlighting) == 0;
+	if (hasHighlighting)
+	{
+		BeginHighlightZone(userQuery.c_str());
+	}
 
 	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
 	{
@@ -623,7 +699,36 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		IM_ASSERT(it != displayOrder.end());
 	}
 
+	if (hasHighlighting)
+	{
+		EndHighlightZone();
+	}
+
 	ImGui::PopID();
+}
+
+bool ImSearch::DoDrawnGlyphsMatch(const ImDrawList& lhsList,
+	const ImDrawIdx* lhsStart,
+	const ImDrawList& rhsList,
+	const ImDrawIdx* rhsStart,
+	int length)
+{
+	for (int i = 0; i < length; i++)
+	{
+		const ImVec2 expectedCurr = lhsList.VtxBuffer[lhsStart[i]].uv;
+		const ImVec2 actualCurr = rhsList.VtxBuffer[rhsStart[i]].uv;
+
+		// use std::not_equal_to instead of != to silence -Wfloat-equal
+		// warnings, for those that want to integrate this library
+		// with a stricter codebase.
+		if (std::not_equal_to<float>{}(expectedCurr.x, actualCurr.x)
+			|| std::not_equal_to<float>{}(expectedCurr.y, actualCurr.y))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -729,7 +834,8 @@ bool ImSearch::operator==(const Searchable& lhs, const Searchable& rhs)
 
 bool ImSearch::operator==(const Input& lhs, const Input& rhs)
 {
-	return lhs.mUserQuery == rhs.mUserQuery
+	return lhs.mFlags == rhs.mFlags
+		&& lhs.mUserQuery == rhs.mUserQuery
 		&& lhs.mEntries == rhs.mEntries
 		&& lhs.mBonuses == rhs.mBonuses;
 }
@@ -810,6 +916,152 @@ void ImSearch::SetPreviewText(const char* preview)
 const char* ImSearch::GetPreviewText()
 {
 	return GetLocalContext().mResult.mOutput.mPreviewText.c_str();
+}
+
+void ImSearch::BeginHighlightZone(const char* textToHighlight)
+{
+	ImGuiStorage* storage = ImGui::GetStateStorage();	
+
+	std::string* str = new std::string(textToHighlight);
+	storage->SetVoidPtr(ImGui::GetID("TextToHighlight"), str);
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	storage->SetInt(ImGui::GetID("StartIdxIdx"), drawList->IdxBuffer.size());
+}
+
+void ImSearch::EndHighlightZone()
+{
+	ImGuiStorage* storage = ImGui::GetStateStorage();
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+	std::string* str = static_cast<std::string*>(storage->GetVoidPtr(ImGui::GetID("TextToHighlight")));
+	const int prevIdxEnd = storage->GetInt(ImGui::GetID("StartIdxIdx"));
+
+	HighlightSubstrings(str->c_str(),
+		str->c_str() + str->size(),
+		drawList,
+		prevIdxEnd,
+		drawList->IdxBuffer.size());
+
+	delete str;
+}
+
+void ImSearch::HighlightSubstrings(const char* substrStart, 
+	const char* substrEnd, 
+	ImDrawList* drawList, 
+	int startIdxIdx,
+	int endIdxIdx)
+{
+	const ImU32 textCol = ImSearch::GetColorU32(ImSearchCol_TextHighlighted);
+	const ImU32 textBgCol = ImSearch::GetColorU32(ImSearchCol_TextHighlightedBg);
+
+	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
+	ImDrawList queryDrawList{ sharedData };
+	queryDrawList.AddDrawCmd();
+	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
+	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
+
+	struct DrawnGlyph
+	{
+		DrawnGlyph(ImDrawList& l, char character)
+		{
+			mIdxIdxStart = l.IdxBuffer.size();
+			l.AddText(
+				{},
+				0xffffffff,
+				&character,
+				&character + 1);
+			mIdxIdxEnd = l.IdxBuffer.size();
+		}
+		int mIdxIdxStart{};
+		int mIdxIdxEnd{};
+	};
+	ImVector<DrawnGlyph> glyphs{};
+
+	for (const char* ch = substrStart; ch < substrEnd; ch++)
+	{
+		const char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(*ch)));
+		const char upper = static_cast<char>(std::toupper(static_cast<unsigned char>(*ch)));
+
+		glyphs.push_back(DrawnGlyph{ queryDrawList, lower });
+		glyphs.push_back(DrawnGlyph{ queryDrawList, upper });
+	}
+
+	queryDrawList.PopClipRect();
+	queryDrawList.PopTextureID();
+
+	for (int matchStart = startIdxIdx; matchStart < endIdxIdx; matchStart++)
+	{
+		int matchEnd = matchStart;
+
+		for (int chIdx = 0; chIdx < substrEnd - substrStart; chIdx++)
+		{
+			bool anyGlyphMatching = false;
+
+			for (int i = 0; i < 2; i++)
+			{
+				const DrawnGlyph& glyph = glyphs[(chIdx * 2) + i];
+				const int glyphLength = glyph.mIdxIdxEnd - glyph.mIdxIdxStart;
+
+				const int nextMatchEnd = matchEnd + glyphLength;
+
+				if (nextMatchEnd <= endIdxIdx
+					&& DoDrawnGlyphsMatch(
+						queryDrawList,
+						queryDrawList.IdxBuffer.Data + glyph.mIdxIdxStart,
+						*drawList,
+						&drawList->IdxBuffer[matchEnd],
+						glyphLength))
+				{
+					matchEnd = nextMatchEnd;
+					anyGlyphMatching = true;
+					break;
+				}
+			}
+
+			if (!anyGlyphMatching)
+			{
+				matchEnd = matchStart;
+				break;
+			}
+		}
+
+		if (matchStart == matchEnd)
+		{
+			continue;
+		}
+
+		ImVec2 min{ INFINITY, INFINITY };
+		ImVec2 max{ -INFINITY, -INFINITY };
+		
+		for (int idxIdx = matchStart; idxIdx < matchEnd; idxIdx++)
+		{
+			ImDrawVert& vert = drawList->VtxBuffer[drawList->IdxBuffer[idxIdx]];
+			vert.col = textCol;
+
+			min.x = std::min(min.x, vert.pos.x);
+			min.y = std::min(min.y, vert.pos.y);
+
+			max.x = std::max(max.x, vert.pos.x);
+			max.y = std::max(max.y, vert.pos.y);
+		}		
+
+		const ImVec2 padding = ImGui::GetStyle().FramePadding;
+		min.x -= padding.x * .5f;
+		min.y -= padding.y * .5f;
+		max.x += padding.x * .5f;
+		max.y += padding.y * .5f;
+
+		drawList->AddRectFilled(min, max, textBgCol);
+
+		const int count = matchEnd - matchStart;
+		drawList->PrimReserve(count, 0);
+
+		for (int idxIdx = matchStart; idxIdx < matchEnd; idxIdx++)
+		{
+			drawList->PrimWriteIdx(drawList->IdxBuffer[idxIdx]);
+		}
+	}
 }
 
 std::vector<std::string> ImSearch::SplitTokens(StrView s)
@@ -1075,3 +1327,5 @@ float ImSearch::WeightedRatio(StrView s1,
 }
 
 #endif // #ifndef IMGUI_DISABLE
+
+

@@ -28,6 +28,9 @@ jobs:
           repository: ocornut/imgui
           path: imgui
 
+      - name: Update package list
+        run: sudo apt-get update
+
       - name: Dependencies
         run: sudo apt-get install g++-multilib
 
