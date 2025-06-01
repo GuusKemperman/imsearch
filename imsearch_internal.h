@@ -1,6 +1,8 @@
 #pragma once
+#include "imgui.h"
+#include "imgui_internal.h"
+
 #ifndef IMGUI_DISABLE
-#include <imgui.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -21,12 +23,12 @@ namespace ImSearch
 {
 	using IndexT = std::uint32_t;
 
-
 	//-----------------------------------------------------------------------------
 	// [SECTION] Constants
 	//-----------------------------------------------------------------------------
 
 	// Anything below this score is not displayed to the user.
+	// Will be adjustable at runtime in the future
 	constexpr float sCutOffStrength = .5f;
 
 	constexpr IndexT sNullIndex = std::numeric_limits<IndexT>::max();
@@ -119,6 +121,7 @@ namespace ImSearch
 
 	struct Input
 	{
+		ImSearchFlags mFlags{};
 		std::vector<Searchable> mEntries{};
 		std::vector<float> mBonuses{};
 		std::string mUserQuery{};
@@ -219,12 +222,6 @@ namespace ImSearch
 	void BeginHighlightZone(const char* textToHighlight);
 
 	void EndHighlightZone();
-
-	//-----------------------------------------------------------------------------
-	// [SECTION] Styling
-	//-----------------------------------------------------------------------------
-
-
 
 	//-----------------------------------------------------------------------------
 	// [SECTION] Fuzzy Searching & String Functions

@@ -81,7 +81,7 @@ void ImSearch::SetCurrentContext(ImSearchContext* ctx)
 	sContext = ctx;
 }
 
-bool ImSearch::BeginSearch()
+bool ImSearch::BeginSearch(ImSearchFlags flags)
 {
 	const ImGuiID imId = ImGui::GetID("Search");
 	ImGui::PushID(static_cast<int>(imId));
@@ -91,6 +91,7 @@ bool ImSearch::BeginSearch()
 	context.ContextStack.emplace(localContext);
 
 	localContext.mHasSubmitted = false;
+	localContext.mInput.mFlags = flags;
 
 	return true;
 }
@@ -410,7 +411,6 @@ ImSearchStyle& ImSearch::GetStyle()
 
 ImU32 ImSearch::GetColorU32(ImSearchCol idx, float alpha_mul)
 {
-	ImSearchStyle& style = GetStyle();
 	ImVec4 c = GetStyleColorVec4(idx);
 	c.w *= ImGui::GetStyle().Alpha * alpha_mul;
 	return ImGui::ColorConvertFloat4ToU32(c);
@@ -432,7 +432,7 @@ void ImSearch::PushStyleColor(ImSearchCol idx, const ImVec4& col)
 	ImSearchContext& context = GetImSearchContext();
 
 	ImGuiColorMod backup;
-	backup.Col = (ImGuiCol)idx;
+	backup.Col = static_cast<ImGuiCol>(idx);
 	backup.BackupValue = context.Style.Colors[idx];
 	context.ColorModifiers.push_back(backup);
 	context.Style.Colors[idx] = col;
@@ -653,7 +653,11 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 
 	const std::vector<IndexT>& displayOrder = result.mOutput.mDisplayOrder;
 
-	BeginHighlightZone(userQuery.c_str());
+	const bool hasHighlighting = (context.mInput.mFlags & ImSearchFlags_NoTextHighlighting) == 0;
+	if (hasHighlighting)
+	{
+		BeginHighlightZone(userQuery.c_str());
+	}
 
 	for (auto it = displayOrder.begin(); it != displayOrder.end(); ++it)
 	{
@@ -695,7 +699,10 @@ void ImSearch::DisplayToUser(const LocalContext& context, const Result& result)
 		IM_ASSERT(it != displayOrder.end());
 	}
 
-	EndHighlightZone();
+	if (hasHighlighting)
+	{
+		EndHighlightZone();
+	}
 
 	ImGui::PopID();
 }
@@ -827,7 +834,8 @@ bool ImSearch::operator==(const Searchable& lhs, const Searchable& rhs)
 
 bool ImSearch::operator==(const Input& lhs, const Input& rhs)
 {
-	return lhs.mUserQuery == rhs.mUserQuery
+	return lhs.mFlags == rhs.mFlags
+		&& lhs.mUserQuery == rhs.mUserQuery
 		&& lhs.mEntries == rhs.mEntries
 		&& lhs.mBonuses == rhs.mBonuses;
 }

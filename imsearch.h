@@ -3,6 +3,13 @@
 #ifndef IMGUI_DISABLE
 
 typedef int ImSearchCol;                // -> enum ImSearchCol_
+typedef int ImSearchFlags;				// -> enum ImSearchFlags_     // Flags: for BeginSearch()
+
+enum ImSearchFlags_
+{
+	ImSearchFlags_None = 0,
+	ImSearchFlags_NoTextHighlighting = 1 << 0
+};
 
 // Plot styling colors.
 enum ImSearchCol_
@@ -71,7 +78,7 @@ namespace ImSearch
 	// - BeginSearch must be unique to the current ImGui ID scope, having multiple
 	//   calls to BeginSearch leads to ID collisions. If you need to avoid ID
 	//   collisions, use ImGui::PushId
-	bool BeginSearch();
+	bool BeginSearch(ImSearchFlags flags = 0);
 
 	// Only call EndSearch() if BeginSearch() returns true! Typically called at the end
 	// of an if statement conditioned on BeginSearch(). See example above.
@@ -227,7 +234,6 @@ namespace ImSearch
 	// You can permanently modify these values through GetStyle().Colors, or 
 	// temporarily modify them with Push/Pop functions below.
 
-	// Provides access to plot style structure for permanant modifications to colors, sizes, etc.
 	ImSearchStyle& GetStyle();
 
 	ImU32 GetColorU32(ImSearchCol idx, float alpha_mul = 1.0f);
