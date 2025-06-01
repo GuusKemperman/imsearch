@@ -4,14 +4,12 @@
 
 typedef int ImSearchCol;                // -> enum ImSearchCol_
 
-typedef int ImSearchColormap;           // -> enum ImSearchColormap_
-
 // Plot styling colors.
 enum ImSearchCol_
 {
 	// item styling colors
-	ImSearchCol_HighlightText, // TODO Documentation
-	ImSearchCol_HighlightTextBg,
+	ImSearchCol_TextHighlighted, // All matching substrings are highlighted by default, and will be this colour
+	ImSearchCol_TextHighlightedBg, // Background colour of all highlighted text
 	ImSearchCol_COUNT
 };
 

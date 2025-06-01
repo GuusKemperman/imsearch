@@ -43,8 +43,8 @@ namespace ImSearch
 
 ImSearchStyle::ImSearchStyle()
 {
-	Colors[ImSearchCol_HighlightText] = ImGui::ColorConvertU32ToFloat4(0xFF000000);
-	Colors[ImSearchCol_HighlightTextBg] = ImGui::ColorConvertU32ToFloat4(0xFF4AC28B);
+	Colors[ImSearchCol_TextHighlighted] = ImGui::ColorConvertU32ToFloat4(0xFF000000);
+	Colors[ImSearchCol_TextHighlightedBg] = ImGui::ColorConvertU32ToFloat4(0xFF4AC28B);
 }
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
@@ -944,8 +944,8 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 	int startIdxIdx,
 	int endIdxIdx)
 {
-	const ImU32 textCol = ImSearch::GetColorU32(ImSearchCol_HighlightText);
-	const ImU32 textBgCol = ImSearch::GetColorU32(ImSearchCol_HighlightTextBg);
+	const ImU32 textCol = ImSearch::GetColorU32(ImSearchCol_TextHighlighted);
+	const ImU32 textBgCol = ImSearch::GetColorU32(ImSearchCol_TextHighlightedBg);
 
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
