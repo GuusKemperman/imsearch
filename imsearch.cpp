@@ -43,8 +43,8 @@ namespace ImSearch
 
 ImSearchStyle::ImSearchStyle()
 {
-	Colors[ImSearchCol_TextHighlighted] = ImGui::ColorConvertU32ToFloat4(0xFF000000);
-	Colors[ImSearchCol_TextHighlightedBg] = ImGui::ColorConvertU32ToFloat4(0xFF4AC28B);
+	Colors[ImSearchCol_TextHighlighted] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	Colors[ImSearchCol_TextHighlightedBg] = { 1.0f, 1.0f, 0.0f, 1.0f };
 }
 
 ImSearch::ImSearchContext* ImSearch::CreateContext()
