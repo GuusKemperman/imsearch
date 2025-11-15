@@ -64,6 +64,9 @@ void ImSearch::DestroyContext(ImSearchContext* ctx)
 		ctx = sContext;
 	}
 
+	IM_ASSERT(ctx != nullptr);
+	IM_ASSERT(ctx->mCutoffStack.empty() && "There were more calls to PushCutoffStrength than to PopCutoffStrength");
+
 	if (sContext == ctx)
 	{
 		SetCurrentContext(nullptr);
@@ -87,8 +90,8 @@ bool ImSearch::BeginSearch(ImSearchFlags flags)
 	ImGui::PushID(static_cast<int>(imId));
 
 	ImSearchContext& context = GetImSearchContext();
-	LocalContext& localContext = context.Contexts[imId];
-	context.ContextStack.emplace(localContext);
+	LocalContext& localContext = context.mContexts[imId];
+	context.mContextStack.emplace(localContext);
 
 	localContext.mHasSubmitted = false;
 	localContext.mInput.mFlags = flags;
@@ -252,7 +255,7 @@ void ImSearch::EndSearch()
 	ImGui::PopID();
 
 	ImSearch::ImSearchContext& context = GetImSearchContext();
-	context.ContextStack.pop();
+	context.mContextStack.pop();
 }
 
 bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable vTable)
@@ -323,6 +326,20 @@ bool ImSearch::Internal::PushSearchable(const char* name, void* functor, VTable 
 void ImSearch::PopSearchable()
 {
 	Internal::PopSearchable(nullptr, nullptr);
+}
+
+void ImSearch::PushCutoffStrength(float value)
+{
+	ImSearchContext& context = GetImSearchContext();
+	context.mCutoffStack.emplace(value);
+}
+
+void ImSearch::PopCutoffStrength()
+{
+	ImSearchContext& context = GetImSearchContext();
+
+	IM_ASSERT(!context.mCutoffStack.empty() && "Called PopCutoffStrength too many times!");
+	context.mCutoffStack.pop();
 }
 
 void ImSearch::Internal::PopSearchable(void* functor, VTable vTable)
@@ -401,7 +418,6 @@ const char* ImSearch::GetUserQuery()
 	LocalContext& context = GetLocalContext();
 	return context.mInput.mUserQuery.c_str();
 }
-
 
 ImSearchStyle& ImSearch::GetStyle() 
 {
@@ -542,10 +558,12 @@ void ImSearch::GenerateDisplayOrder(const Input& input, ReusableBuffers& buffers
 	output.mDisplayOrder.clear();
 	buffers.mTempIndices.clear();
 
+	float cutoffStrength = GetCutoffStrength();
+
 	for (IndexT i = 0; i < static_cast<IndexT>(input.mEntries.size()); i++)
 	{
 		if (input.mEntries[i].mIndexOfParent == sNullIndex
-			&& buffers.mScores[i] >= sCutOffStrength)
+			&& buffers.mScores[i] >= cutoffStrength)
 		{
 			buffers.mTempIndices.emplace_back(i);
 		}
@@ -564,6 +582,8 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 	IndexT endInIndicesBuffer,
 	Output& output)
 {
+	float cutoffStrength = GetCutoffStrength();
+
 	std::stable_sort(buffers.mTempIndices.begin() + startInIndicesBuffer,
 		buffers.mTempIndices.begin() + endInIndicesBuffer,
 		[&](IndexT lhsIndex, IndexT rhsIndex) -> bool
@@ -587,7 +607,7 @@ void ImSearch::AppendToDisplayOrder(const Input& input,
 			childIndex != sNullIndex;
 			childIndex = input.mEntries[childIndex].mIndexOfNextSibling)
 		{
-			if (buffers.mScores[childIndex] >= sCutOffStrength)
+			if (buffers.mScores[childIndex] >= cutoffStrength)
 			{
 				buffers.mTempIndices.emplace_back(childIndex);
 			}
@@ -843,8 +863,8 @@ bool ImSearch::operator==(const Input& lhs, const Input& rhs)
 ImSearch::LocalContext& ImSearch::GetLocalContext()
 {
 	ImSearch::ImSearchContext& ImSearchContext = GetImSearchContext();
-	IM_ASSERT(!ImSearchContext.ContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
-	return ImSearchContext.ContextStack.top();
+	IM_ASSERT(!ImSearchContext.mContextStack.empty() && "Not currently in between a ImSearch::BeginSearch and ImSearch::EndSearch");
+	return ImSearchContext.mContextStack.top();
 }
 
 ImSearch::ImSearchContext& ImSearch::GetImSearchContext()
@@ -906,6 +926,12 @@ int ImSearch::GetNumItemsFilteredOut()
 	IM_ASSERT(numInDisplayOrder <= numSubmitted);
 
 	return numSubmitted - numInDisplayOrder;
+}
+
+float ImSearch::GetCutoffStrength()
+{
+	ImSearchContext& context = GetImSearchContext();
+	return context.mCutoffStack.empty() ? sDefaultCutoffStrength : context.mCutoffStack.top();
 }
 
 void ImSearch::SetPreviewText(const char* preview)

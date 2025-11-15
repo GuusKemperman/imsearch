@@ -141,7 +141,7 @@ namespace ImSearch
 	void SearchableItem(const char* name, T&& callback);
 
 	// Push a searchable with a callback, wrapping some ImGui function calls.
-	// If this function returns true, EndSearch() MUST
+	// If this function returns true, PopSearchable() MUST
 	// be called! You are encouraged to use the following convention:
 	//
 	// if (PushSearchable("Hello world!", [](const char* name) { return ImGui::TreeNode(name); })
@@ -179,6 +179,15 @@ namespace ImSearch
 	//-----------------------------------------------------------------------------
 	// [SECTION] Modifiers
 	//-----------------------------------------------------------------------------
+
+	// Anything that has a relevancy score below the cutoff strength 
+	// is not displayed to the user. Note that the relevancy of items 
+	// is within the range of 0.0f to 1.0f. (unless you are using SetRelevancyBonus).
+	// 
+	// The default cut off strength is sDefaultCutoffStrength (see imsearch_internal.h).
+	void PushCutoffStrength(float value);
+
+	void PopCutoffStrength();
 
 	// You can artificially increase the relevancy for items you think might
 	// be more likely to be what the user is looking for.

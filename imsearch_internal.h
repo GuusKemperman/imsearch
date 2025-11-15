@@ -28,8 +28,7 @@ namespace ImSearch
 	//-----------------------------------------------------------------------------
 
 	// Anything below this score is not displayed to the user.
-	// Will be adjustable at runtime in the future
-	constexpr float sCutOffStrength = .5f;
+	constexpr float sDefaultCutoffStrength = .5f;
 
 	constexpr IndexT sNullIndex = std::numeric_limits<IndexT>::max();
 
@@ -174,9 +173,11 @@ namespace ImSearch
 
 	struct ImSearchContext
 	{
-		std::unordered_map<ImGuiID, LocalContext> Contexts{};
-		std::stack<std::reference_wrapper<LocalContext>> ContextStack{};
+		std::unordered_map<ImGuiID, LocalContext> mContexts{};
+		std::stack<std::reference_wrapper<LocalContext>> mContextStack{};
 		std::unordered_map<std::string, std::string> mTokenisedStrings{};
+
+		std::stack<float> mCutoffStack{};
 
 		// Style and Colormaps
 		ImSearchStyle                 Style;
@@ -214,6 +215,8 @@ namespace ImSearch
 	//-----------------------------------------------------------------------------
 
 	int GetNumItemsFilteredOut();
+
+	float GetCutoffStrength();
 
 	void SetPreviewText(const char* preview);
 
