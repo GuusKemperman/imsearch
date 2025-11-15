@@ -1,5 +1,5 @@
 # This build script is not meant for general use, it is for CI use only!
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 project(imsearch)
 
 #
