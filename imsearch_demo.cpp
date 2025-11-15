@@ -4,7 +4,6 @@
 #include "imsearch_internal.h"
 #include "imgui.h"
 
-#include <chrono>
 #include <array>
 #include <string>
 #include <functional>
@@ -238,19 +237,19 @@ void ImSearch::ShowDemoWindow(bool* p_open)
 						[&hiIWentOutOfScope](const char* name) // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 						{                                                                                       /*^*/
 							ImGui::TextUnformatted(name);                                                       /*^*/
-							/*^*/
-// This would be invalid!                                                           /*^*/
-// ImGui::InputInt("DontDoThis", &hiIWentOutOfScope);                               /*^*/
-																					/*^*/
+																												/*^*/
+							// This would be invalid!                                                           /*^*/
+							// ImGui::InputInt("DontDoThis", &hiIWentOutOfScope);                               /*^*/
+																												/*^*/
 							(void)(hiIWentOutOfScope); // (just to silence warnings of it being unused			/*^*/
 						});                                                                                     /*^*/
 				}                                                                                               /*^*/
 																												/*^*/
 				ImSearch::PopSearchable();                                                                      /*^*/
-				/*^*/
-// Your callbacks can be invoked at any point between your call to PushSearchable and the next  /*^*/
-// ImSearch::Submit or ImSearch::EndSearch is reached. Make sure your callbacks remain valid,   /*^*/
-// with nothing dangling.                                                                       /*^*/
+																												/*^*/
+				// Your callbacks can be invoked at any point between your call to PushSearchable and the next  /*^*/
+				// ImSearch::Submit or ImSearch::EndSearch is reached. Make sure your callbacks remain valid,   /*^*/
+				// with nothing dangling.                                                                       /*^*/
 				ImSearch::Submit(); // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>^
 			}
 
