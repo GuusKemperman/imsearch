@@ -984,7 +984,8 @@ void ImSearch::HighlightSubstrings(const char* substrStart,
 	ImDrawListSharedData* sharedData = ImGui::GetDrawListSharedData();
 	ImDrawList queryDrawList{ sharedData };
 	queryDrawList.AddDrawCmd();
-	queryDrawList.PushTextureID(ImGui::GetFont()->ContainerAtlas->TexID);
+	
+	queryDrawList.PushTextureID(ImGui::GetIO().Fonts->TexID);
 	queryDrawList.PushClipRect({ -INFINITY, -INFINITY }, { INFINITY, INFINITY });
 
 	struct DrawnGlyph
